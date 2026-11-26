@@ -123,7 +123,11 @@ export type AlertCode =
   | 'screening_overdue' | 'histology_pending' | 'pcos_criteria' | 'prolapse_stage' | 'severe_pain' | 'gyn_hypertension'
   | 'poi_confirmed' | 'poi_possible' | 'hyperprolactinemia' | 'tsh_high' | 'tsh_low' | 'hyperandrogenism_lab' | 'diabetes_range'
   | 'prediabetes_range' | 'anemia_lab' | 'iron_deficiency' | 'ca125_raised' | 'mrs_severe' | 'mrs_psychological'
-  | 'continuous_leakage' | 'iciq_severe' | 'orads_5' | 'orads_4' | 'rmi_high' | 'roma_high';
+  | 'continuous_leakage' | 'iciq_severe' | 'orads_5' | 'orads_4' | 'rmi_high' | 'roma_high'
+  // fertility
+  | 'ohss_risk' | 'trigger_ready' | 'start_antagonist' | 'premature_lh' | 'p4_elevated' | 'thin_endometrium'
+  | 'storage_consent_expired' | 'storage_consent_expiring' | 'beta_hcg_due' | 'poor_responder' | 'hyper_responder'
+  | 'iui_unlikely' | 'azoospermia' | 'tubal_blocked';
 
 export interface ClinicalAlert {
   code: AlertCode;

@@ -24,8 +24,11 @@ function initialMethod(p?: Pregnancy | null): DatingMethod {
   return 'lmp';
 }
 
-export function PregnancyFormModal({ open, onClose, patient, pregnancy }: {
+export function PregnancyFormModal({ open, onClose, patient, pregnancy, prefill, onSaved }: {
   open: boolean; onClose: () => void; patient: Patient; pregnancy?: Pregnancy | null;
+  /** used when registering from an IVF transfer */
+  prefill?: { transferDate: string; embryoAgeDays: 3 | 5 | 6; plurality: number; conception: string };
+  onSaved?: (p: Pregnancy) => void;
 }) {
   const { t } = useTranslation();
   const lang = useLang();
@@ -41,15 +44,16 @@ export function PregnancyFormModal({ open, onClose, patient, pregnancy }: {
 
   const [f, setF] = useState(() => ({
     clinic_id: defaultClinic,
-    method: initialMethod(pregnancy),
+    method: prefill ? ('ivf_transfer' as DatingMethod) : initialMethod(pregnancy),
     lmp: str(pregnancy?.lmp), cycle: str(pregnancy?.cycle_length_days ?? 28),
     usDate: str(pregnancy?.us_dating_date),
     usWeeks: pregnancy?.us_dating_ga_days != null ? String(Math.floor(pregnancy.us_dating_ga_days / 7)) : '',
     usDays: pregnancy?.us_dating_ga_days != null ? String(pregnancy.us_dating_ga_days % 7) : '0',
-    transferDate: str(pregnancy?.transfer_date), embryoAge: str(pregnancy?.embryo_age_days ?? 5),
+    transferDate: str(prefill?.transferDate ?? pregnancy?.transfer_date), embryoAge: str(prefill?.embryoAgeDays ?? pregnancy?.embryo_age_days ?? 5),
     cs: str(pregnancy?.previous_cs_count ?? 0), plan: str(pregnancy?.high_risk_plan), meds: str(pregnancy?.current_medications),
     gravida: str(pregnancy?.gravida ?? 1), para: str(pregnancy?.para ?? 0), abortus: str(pregnancy?.abortus ?? 0), living: str(pregnancy?.living ?? 0),
-    plurality: str(pregnancy?.plurality ?? 1), chorionicity: pregnancy?.chorionicity ?? '', conception: pregnancy?.conception ?? 'spontaneous',
+    plurality: str(prefill?.plurality ?? pregnancy?.plurality ?? 1), chorionicity: pregnancy?.chorionicity ?? '',
+    conception: prefill?.conception ?? pregnancy?.conception ?? 'spontaneous',
     risk_level: pregnancy?.risk_level ?? 'low', risk_factors: pregnancy?.risk_factors ?? [] as string[],
     booking_date: str(pregnancy?.booking_date ?? todayIso()), weight: str(pregnancy?.booking_weight_kg), height: str(pregnancy?.height_cm),
     notes: str(pregnancy?.notes),
@@ -99,7 +103,8 @@ export function PregnancyFormModal({ open, onClose, patient, pregnancy }: {
       };
       return editing ? api.updatePregnancy(pregnancy!.id, input) : api.createPregnancy(input);
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      onSaved?.(saved);
       void qc.invalidateQueries({ queryKey: ['clinical', patient.id] });
       void qc.invalidateQueries({ queryKey: ['patient', patient.id] });
       void qc.invalidateQueries({ queryKey: ['patients'] });

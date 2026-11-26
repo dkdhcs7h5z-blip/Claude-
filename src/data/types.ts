@@ -126,7 +126,28 @@ export interface FertilityCycle {
   start_date: string;
   status: 'planned' | 'stimulation' | 'retrieval' | 'transfer' | 'luteal' | 'completed' | 'cancelled';
   outcome: string | null;
+  cycle_number?: number | null;
+  day1_date?: string | null;
+  indication?: string | null;
+  stim_protocol?: StimProtocol | null;
+  starting_dose_iu?: number | null;
+  gonadotropin?: string | null;
+  trigger_type?: 'hcg' | 'gnrh_agonist' | 'dual' | 'none' | null;
+  trigger_at?: string | null;
+  insemination?: 'ivf' | 'icsi' | 'iui' | 'none' | null;
+  sperm_source?: 'partner_fresh' | 'partner_frozen' | 'donor' | 'surgical' | null;
+  retrieval_at?: string | null;
+  oocytes_retrieved?: number | null;
+  mii_oocytes?: number | null;
+  fertilized_2pn?: number | null;
+  retrieval_complications?: string | null;
+  freeze_all?: boolean;
+  freeze_all_reason?: 'ohss_risk' | 'progesterone' | 'endometrium' | 'pgt' | 'elective' | 'other' | null;
+  cancel_reason?: string | null;
 }
+
+export type StimProtocol = 'antagonist' | 'long_agonist' | 'short_agonist' | 'ppos' | 'mild' | 'natural' | 'letrozole' | 'clomiphene' | 'hrt_fet' | 'natural_fet';
+export type FertilityCycleInput = Omit<FertilityCycle, 'id' | 'patient_id' | 'clinic_id'> & { clinic_id?: string | null };
 
 export interface FetalAssessment {
   id: string;
@@ -707,4 +728,177 @@ export interface GynWorklistRow {
   pending_histology: number;
   last_visit_date: string | null;
   last_complaints: string[] | null;
+}
+
+// --- Infertility & reproductive medicine ----------------------------------------------
+export interface FertilityProfile {
+  patient_id: string;
+  clinic_id: string;
+  infertility_type: 'primary' | 'secondary' | null;
+  duration_months: number | null;
+  female_factors: string[];
+  male_factor: boolean | null;
+  tubal_assessment: 'not_done' | 'bilateral_patent' | 'unilateral_patent' | 'bilateral_blocked' | 'hydrosalpinx' | null;
+  tubal_method: 'hsg' | 'hycosy' | 'laparoscopy' | null;
+  partner_name: string | null;
+  partner_dob: string | null;
+  partner_phone: string | null;
+  partner_blood_group: string | null;
+  previous_treatments: string | null;
+  notes: string | null;
+}
+export type FertilityProfileInput = Omit<FertilityProfile, 'patient_id'>;
+
+export interface SemenAnalysis {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  collected_at: string;
+  sample_type: 'diagnostic' | 'post_wash' | 'frozen_thawed' | 'surgical';
+  abstinence_days: number | null;
+  volume_ml: number | null;
+  concentration_m_ml: number | null;
+  progressive_pct: number | null;
+  total_motility_pct: number | null;
+  normal_forms_pct: number | null;
+  vitality_pct: number | null;
+  ph: number | null;
+  leukocytes_m_ml: number | null;
+  dna_fragmentation_pct: number | null;
+  total_count_m: number | null;
+  tmsc_m: number | null;
+  notes: string | null;
+  recorded_by: string | null;
+}
+export type SemenAnalysisInput = Omit<SemenAnalysis, 'id' | 'patient_id' | 'clinic_id' | 'total_count_m' | 'tmsc_m' | 'recorded_by'>;
+
+export interface StimulationMonitoring {
+  id: string;
+  cycle_id: string;
+  patient_id: string;
+  clinic_id: string;
+  monitored_on: string;
+  stim_day: number | null;
+  e2_pmol_l: number | null;
+  lh_iu_l: number | null;
+  p4_nmol_l: number | null;
+  endometrium_mm: number | null;
+  follicles_right: number[];
+  follicles_left: number[];
+  fsh_dose_iu: number | null;
+  antagonist: boolean;
+  notes: string | null;
+  recorded_by: string | null;
+}
+export type StimulationMonitoringInput = Omit<StimulationMonitoring, 'id' | 'cycle_id' | 'patient_id' | 'clinic_id' | 'recorded_by'>;
+
+export interface Embryo {
+  id: string;
+  cycle_id: string;
+  patient_id: string;
+  clinic_id: string;
+  embryo_no: number;
+  day_observed: number | null;
+  stage: 'zygote' | 'cleavage' | 'morula' | 'blastocyst' | 'arrested';
+  cell_count: number | null;
+  fragmentation_grade: number | null;
+  blast_expansion: number | null;
+  icm_grade: 'A' | 'B' | 'C' | null;
+  te_grade: 'A' | 'B' | 'C' | null;
+  pgt_result: 'not_tested' | 'pending' | 'euploid' | 'aneuploid' | 'mosaic' | 'no_result';
+  status: 'in_culture' | 'transferred' | 'frozen' | 'thawed' | 'discarded';
+  frozen_at: string | null;
+  storage_location: string | null;
+  consent_expires_on: string | null;
+  notes: string | null;
+}
+export type EmbryoInput = Omit<Embryo, 'id' | 'cycle_id' | 'patient_id' | 'clinic_id'>;
+
+export interface EmbryoTransfer {
+  id: string;
+  cycle_id: string;
+  patient_id: string;
+  clinic_id: string;
+  transfer_on: string;
+  fresh: boolean;
+  embryo_ids: string[];
+  embryos_transferred: number;
+  embryo_day: number;
+  endometrium_mm: number | null;
+  difficulty: 'easy' | 'difficult' | 'very_difficult' | null;
+  beta_hcg_on: string | null;
+  beta_hcg_value: number | null;
+  gestational_sacs: number | null;
+  fetal_hearts: number | null;
+  outcome: 'pending' | 'negative' | 'biochemical' | 'clinical' | 'ectopic' | 'miscarriage' | 'ongoing';
+  pregnancy_id: string | null;
+  notes: string | null;
+  recorded_by: string | null;
+}
+export type EmbryoTransferInput = Omit<EmbryoTransfer, 'id' | 'cycle_id' | 'patient_id' | 'clinic_id' | 'recorded_by' | 'pregnancy_id'
+  | 'beta_hcg_on' | 'beta_hcg_value' | 'gestational_sacs' | 'fetal_hearts' | 'outcome'>;
+
+export interface FertilityDetail {
+  profile: FertilityProfile | null;
+  semen: SemenAnalysis[];
+  cycles: FertilityCycle[];
+  monitoring: StimulationMonitoring[];
+  embryos: Embryo[];
+  transfers: EmbryoTransfer[];
+  labs: LabResult[];
+}
+
+export interface FertilityWorklistRow {
+  cycle_id: string;
+  patient_id: string;
+  clinic_id: string;
+  cycle_type: FertilityCycle['cycle_type'];
+  cycle_number: number | null;
+  status: FertilityCycle['status'];
+  start_date: string;
+  stim_protocol: StimProtocol | null;
+  trigger_at: string | null;
+  retrieval_at: string | null;
+  oocytes_retrieved: number | null;
+  freeze_all: boolean;
+  mrn: string;
+  first_name_en: string | null;
+  last_name_en: string | null;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  date_of_birth: string;
+  last_monitoring_on: string | null;
+  last_stim_day: number | null;
+  last_e2: number | null;
+  last_follicles_right: number[] | null;
+  last_follicles_left: number[] | null;
+  last_transfer_on: string | null;
+  last_transfer_day: number | null;
+  last_transfer_outcome: EmbryoTransfer['outcome'] | null;
+  last_beta_hcg: number | null;
+}
+
+export interface CryoRow {
+  embryo_id: string;
+  patient_id: string;
+  clinic_id: string;
+  cycle_id: string;
+  embryo_no: number;
+  day_observed: number | null;
+  stage: Embryo['stage'];
+  blast_expansion: number | null;
+  icm_grade: string | null;
+  te_grade: string | null;
+  cell_count: number | null;
+  fragmentation_grade: number | null;
+  pgt_result: Embryo['pgt_result'];
+  frozen_at: string | null;
+  storage_location: string | null;
+  consent_expires_on: string | null;
+  cycle_number: number | null;
+  mrn: string;
+  first_name_en: string | null;
+  last_name_en: string | null;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
 }

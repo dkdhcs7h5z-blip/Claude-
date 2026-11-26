@@ -1,5 +1,6 @@
 /* Fictional sample data for DEMO MODE only. No real persons or organizations. */
 import type {
+  Embryo, EmbryoTransfer, FertilityProfile, SemenAnalysis, StimulationMonitoring,
   LabResult, MenopauseAssessment, UrogynAssessment,
   CervicalScreening, Colposcopy, GynProcedure, GynProfile, GynUltrasound, GynVisit,
   AntenatalVisit, Delivery, Newborn, FetalBiometry, PostnatalVisit, LabourObservation,
@@ -147,11 +148,18 @@ export const DEMO_PREGNANCIES: Pregnancy[] = [
 
 export const DEMO_CYCLES: FertilityCycle[] = [
   { id: 'fc1', patient_id: 'p6', clinic_id: 'c-ivf', cycle_type: 'icsi', protocol: 'Antagonist', start_date: dateAgo(9),
-    status: 'stimulation', outcome: null },
+    status: 'stimulation', outcome: null, cycle_number: 2, day1_date: dateAgo(10), indication: 'Male factor (OAT), 3 years primary infertility',
+    stim_protocol: 'antagonist', starting_dose_iu: 225, gonadotropin: 'rFSH', insemination: 'icsi', sperm_source: 'partner_fresh', freeze_all: false },
   { id: 'fc2', patient_id: 'p5', clinic_id: 'c-main', cycle_type: 'iui', protocol: 'Letrozole + hCG trigger', start_date: dateAgo(14),
-    status: 'luteal', outcome: null },
-  { id: 'fc3', patient_id: 'p7', clinic_id: 'c-ivf', cycle_type: 'icsi', protocol: 'Long agonist', start_date: dateAgo(120),
-    status: 'completed', outcome: 'clinical_pregnancy' },
+    status: 'luteal', outcome: null, cycle_number: 1, day1_date: dateAgo(16), stim_protocol: 'letrozole', insemination: 'iui',
+    sperm_source: 'partner_fresh', trigger_type: 'hcg', trigger_at: daysAgo(3), freeze_all: false },
+  { id: 'fc3', patient_id: 'p7', clinic_id: 'c-ivf', cycle_type: 'icsi', protocol: 'Long agonist', start_date: dateAgo(200),
+    status: 'completed', outcome: 'clinical_pregnancy', cycle_number: 1, day1_date: dateAgo(222), indication: 'Tubal factor (bilateral hydrosalpinx, post salpingectomy)',
+    stim_protocol: 'long_agonist', starting_dose_iu: 150, gonadotropin: 'hMG', trigger_type: 'hcg', trigger_at: daysAgo(188), insemination: 'icsi',
+    sperm_source: 'partner_fresh', retrieval_at: dateAgo(186), oocytes_retrieved: 14, mii_oocytes: 11, fertilized_2pn: 9, freeze_all: false },
+  { id: 'fc0', patient_id: 'p6', clinic_id: 'c-ivf', cycle_type: 'icsi', protocol: 'Antagonist', start_date: dateAgo(260),
+    status: 'completed', outcome: 'negative_bhcg', cycle_number: 1, stim_protocol: 'antagonist', starting_dose_iu: 225, insemination: 'icsi',
+    sperm_source: 'partner_fresh', retrieval_at: dateAgo(248), oocytes_retrieved: 9, mii_oocytes: 7, fertilized_2pn: 5, freeze_all: false },
 ];
 
 export const DEMO_FETAL: FetalAssessment[] = [];
@@ -483,6 +491,8 @@ export const DEMO_LABS: LabResult[] = [
   // p3 — heavy menstrual bleeding: iron deficiency anaemia
   lab('p3', 3, 'hemoglobin', 9.6, 'g/dL', 12, 15.5), lab('p3', 3, 'ferritin', 7, 'µg/L', 15, 150), lab('p3', 3, 'tsh', 1.8, 'mIU/L', 0.27, 4.2),
   // p12 — postmenopausal, adnexal cyst: CA-125 & HE4
+  lab('p6', 30, 'amh', 1.6, 'ng/mL', null, null), lab('p6', 30, 'fsh', 6.8, 'IU/L', 3.5, 12.5, 3), lab('p6', 30, 'tsh', 1.9, 'mIU/L', 0.27, 4.2),
+  lab('p7', 240, 'amh', 3.2, 'ng/mL', null, null),
   lab('p12', 2, 'ca125', 22, 'U/mL', 0, 35), lab('p12', 2, 'he4', 61, 'pmol/L', null, null), lab('p12', 2, 'fsh', 78, 'IU/L', null, null),
 ];
 export const DEMO_MRS: MenopauseAssessment[] = [
@@ -492,4 +502,70 @@ export const DEMO_MRS: MenopauseAssessment[] = [
 export const DEMO_ICIQ: UrogynAssessment[] = [
   { id: 'iq1', patient_id: 'p12', clinic_id: 'c-main', assessed_at: dateAgo(2), frequency: 2, amount: 2, interference: 4, score: 8,
     leak_situations: ['cough_sneeze', 'before_toilet'], notes: null, recorded_by: 'u-cons' },
+];
+
+// --- Infertility -------------------------------------------------------------------
+export const DEMO_FERTILITY_PROFILES: FertilityProfile[] = [
+  { patient_id: 'p6', clinic_id: 'c-ivf', infertility_type: 'primary', duration_months: 38, female_factors: [], male_factor: true,
+    tubal_assessment: 'bilateral_patent', tubal_method: 'hsg', partner_name: 'Ahmed Saber', partner_dob: '1985-02-14', partner_phone: '+20 100 000 0601',
+    partner_blood_group: 'O+', previous_treatments: '3 IUI cycles (negative); ICSI #1 negative β-hCG', notes: null },
+  { patient_id: 'p7', clinic_id: 'c-ivf', infertility_type: 'primary', duration_months: 26, female_factors: ['tubal'], male_factor: false,
+    tubal_assessment: 'hydrosalpinx', tubal_method: 'laparoscopy', partner_name: 'Omar Gamal', partner_dob: '1990-06-01', partner_phone: null,
+    partner_blood_group: 'B+', previous_treatments: 'Bilateral salpingectomy for hydrosalpinges', notes: null },
+  { patient_id: 'p5', clinic_id: 'c-main', infertility_type: 'secondary', duration_months: 18, female_factors: ['ovulatory'], male_factor: false,
+    tubal_assessment: 'bilateral_patent', tubal_method: 'hycosy', partner_name: 'Karim Fathy', partner_dob: null, partner_phone: null,
+    partner_blood_group: null, previous_treatments: null, notes: null },
+];
+
+const sa = (o: Partial<SemenAnalysis> & Pick<SemenAnalysis, 'id' | 'patient_id' | 'clinic_id' | 'collected_at'>): SemenAnalysis => {
+  const base = { sample_type: 'diagnostic' as const, abstinence_days: 3, volume_ml: null, concentration_m_ml: null, progressive_pct: null,
+    total_motility_pct: null, normal_forms_pct: null, vitality_pct: null, ph: null, leukocytes_m_ml: null, dna_fragmentation_pct: null,
+    notes: null, recorded_by: 'u-spec', ...o };
+  const total = base.volume_ml != null && base.concentration_m_ml != null ? Math.round(base.volume_ml * base.concentration_m_ml * 100) / 100 : null;
+  return { ...base, total_count_m: total, tmsc_m: total != null && base.progressive_pct != null ? Math.round(total * base.progressive_pct) / 100 : null };
+};
+export const DEMO_SEMEN: SemenAnalysis[] = [
+  sa({ id: 'sa1', patient_id: 'p6', clinic_id: 'c-ivf', collected_at: dateAgo(120), volume_ml: 2.1, concentration_m_ml: 6.5, progressive_pct: 18,
+    total_motility_pct: 28, normal_forms_pct: 2, vitality_pct: 61, ph: 7.6, leukocytes_m_ml: 0.4, dna_fragmentation_pct: 34 }),
+  sa({ id: 'sa2', patient_id: 'p7', clinic_id: 'c-ivf', collected_at: dateAgo(230), volume_ml: 3.2, concentration_m_ml: 48, progressive_pct: 41,
+    total_motility_pct: 58, normal_forms_pct: 5, vitality_pct: 78, ph: 7.5 }),
+  sa({ id: 'sa3', patient_id: 'p5', clinic_id: 'c-main', collected_at: dateAgo(40), volume_ml: 2.8, concentration_m_ml: 22, progressive_pct: 32,
+    total_motility_pct: 46, normal_forms_pct: 4, vitality_pct: 70 }),
+];
+
+const mon = (id: string, cycle_id: string, patient_id: string, clinic_id: string, ago: number, o: Partial<StimulationMonitoring>): StimulationMonitoring => ({
+  id, cycle_id, patient_id, clinic_id, monitored_on: dateAgo(ago), stim_day: null, e2_pmol_l: null, lh_iu_l: null, p4_nmol_l: null, endometrium_mm: null,
+  follicles_right: [], follicles_left: [], fsh_dose_iu: null, antagonist: false, notes: null, recorded_by: 'u-spec', ...o,
+});
+export const DEMO_MONITORING: StimulationMonitoring[] = [
+  mon('sm1', 'fc1', 'p6', 'c-ivf', 9, { stim_day: 1, e2_pmol_l: 140, lh_iu_l: 4.8, endometrium_mm: 4.2, follicles_right: [5, 6, 4, 5, 6, 5, 4], follicles_left: [5, 4, 6, 5, 5, 4], fsh_dose_iu: 225, notes: 'Baseline AFC 13' }),
+  mon('sm2', 'fc1', 'p6', 'c-ivf', 5, { stim_day: 5, e2_pmol_l: 1450, lh_iu_l: 3.9, endometrium_mm: 7.1, follicles_right: [12, 11, 10, 9, 9, 8], follicles_left: [12, 10, 9, 8, 8], fsh_dose_iu: 225 }),
+  mon('sm3', 'fc1', 'p6', 'c-ivf', 3, { stim_day: 7, e2_pmol_l: 3600, lh_iu_l: 5.2, p4_nmol_l: 1.8, endometrium_mm: 8.6, follicles_right: [15, 14, 13, 12, 11, 10], follicles_left: [16, 13, 12, 11, 10], fsh_dose_iu: 225, antagonist: true }),
+  mon('sm4', 'fc1', 'p6', 'c-ivf', 1, { stim_day: 9, e2_pmol_l: 7900, lh_iu_l: 2.1, p4_nmol_l: 2.9, endometrium_mm: 10.2, follicles_right: [19, 18, 17, 15, 14, 12], follicles_left: [18, 16, 15, 13, 12], fsh_dose_iu: 225, antagonist: true }),
+  mon('sm5', 'fc2', 'p5', 'c-main', 4, { stim_day: 11, e2_pmol_l: 980, lh_iu_l: 8.4, endometrium_mm: 8.8, follicles_right: [19], follicles_left: [14] }),
+];
+
+const emb = (id: string, cycle_id: string, patient_id: string, no: number, o: Partial<Embryo>): Embryo => ({
+  id, cycle_id, patient_id, clinic_id: 'c-ivf', embryo_no: no, day_observed: 5, stage: 'blastocyst', cell_count: null, fragmentation_grade: null,
+  blast_expansion: null, icm_grade: null, te_grade: null, pgt_result: 'not_tested', status: 'in_culture', frozen_at: null, storage_location: null,
+  consent_expires_on: null, notes: null, ...o,
+});
+export const DEMO_EMBRYOS: Embryo[] = [
+  emb('em1', 'fc3', 'p7', 1, { blast_expansion: 4, icm_grade: 'A', te_grade: 'A', status: 'transferred' }),
+  emb('em2', 'fc3', 'p7', 2, { blast_expansion: 4, icm_grade: 'A', te_grade: 'B', status: 'transferred' }),
+  emb('em3', 'fc3', 'p7', 3, { blast_expansion: 4, icm_grade: 'B', te_grade: 'B', status: 'frozen', frozen_at: dateAgo(181), storage_location: 'Tank 1 / Canister 3 / Straw 12', consent_expires_on: dateAgo(-60) }),
+  emb('em4', 'fc3', 'p7', 4, { day_observed: 6, blast_expansion: 3, icm_grade: 'B', te_grade: 'B', status: 'frozen', frozen_at: dateAgo(180), storage_location: 'Tank 1 / Canister 3 / Straw 13', consent_expires_on: dateAgo(-60) }),
+  emb('em5', 'fc3', 'p7', 5, { day_observed: 6, blast_expansion: 3, icm_grade: 'B', te_grade: 'C', status: 'frozen', frozen_at: dateAgo(180), storage_location: 'Tank 1 / Canister 3 / Straw 14', consent_expires_on: dateAgo(-1645) }),
+  emb('em6', 'fc3', 'p7', 6, { day_observed: 5, stage: 'arrested', status: 'discarded' }),
+  emb('em7', 'fc0', 'p6', 1, { blast_expansion: 3, icm_grade: 'B', te_grade: 'B', status: 'transferred' }),
+  emb('em8', 'fc0', 'p6', 2, { day_observed: 3, stage: 'cleavage', cell_count: 6, fragmentation_grade: 2, status: 'discarded' }),
+];
+
+export const DEMO_TRANSFERS: EmbryoTransfer[] = [
+  { id: 'et1', cycle_id: 'fc3', patient_id: 'p7', clinic_id: 'c-ivf', transfer_on: dateAgo(181), fresh: true, embryo_ids: ['em1', 'em2'],
+    embryos_transferred: 2, embryo_day: 5, endometrium_mm: 10.5, difficulty: 'easy', beta_hcg_on: dateAgo(172), beta_hcg_value: 612,
+    gestational_sacs: 2, fetal_hearts: 2, outcome: 'ongoing', pregnancy_id: 'g4', notes: 'DCDA twins on 7-week scan', recorded_by: 'u-spec' },
+  { id: 'et0', cycle_id: 'fc0', patient_id: 'p6', clinic_id: 'c-ivf', transfer_on: dateAgo(243), fresh: true, embryo_ids: ['em7'],
+    embryos_transferred: 1, embryo_day: 5, endometrium_mm: 9.1, difficulty: 'easy', beta_hcg_on: dateAgo(234), beta_hcg_value: 2,
+    gestational_sacs: 0, fetal_hearts: 0, outcome: 'negative', pregnancy_id: null, notes: null, recorded_by: 'u-spec' },
 ];

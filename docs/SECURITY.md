@@ -63,7 +63,7 @@ Researchers never query patient tables. `research_cohort(project)` (security def
 
 ## Verified by tests
 
-`npm run test:db` applies all migrations to a fresh PostgreSQL 16 database and runs 213 cases covering anonymous access, cross-clinic isolation, private records, role limits, sharing and revocation, break-glass, privilege escalation, encounter signing/amendment, storage paths, research de-identification, archiving, audit immutability, deactivation, and obstetric data integrity (dating rules, signed-visit immutability, private visit vitals, delivery rules), and gynecology record integrity.
+`npm run test:db` applies all migrations to a fresh PostgreSQL 16 database and runs 247 cases covering anonymous access, cross-clinic isolation, private records, role limits, sharing and revocation, break-glass, privilege escalation, encounter signing/amendment, storage paths, research de-identification, archiving, audit immutability, deactivation, and obstetric data integrity (dating rules, signed-visit immutability, private visit vitals, delivery rules), gynecology record integrity, and fertility integrity (embryo ownership and availability at transfer, frozen-embryo storage data, Gardner fields, retrieval counts, transfer outcome consistency, cross-clinic isolation).
 
 ## Production deployment checklist
 

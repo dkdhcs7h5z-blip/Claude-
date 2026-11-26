@@ -1,3 +1,4 @@
+import ivfEn from './ivf.en';
 import gynEn from './gyn.en';
 import obEn from './ob.en';
 const en = {
@@ -208,6 +209,7 @@ const en = {
   pwa: { updateAvailable: 'A new version is available.', reload: 'Reload' },
   ob: obEn,
   gyn: gynEn,
+  ivf: ivfEn,
 };
 
 export default en;

@@ -1,4 +1,6 @@
 import type {
+  CryoRow, EmbryoInput, EmbryoTransfer, EmbryoTransferInput, FertilityCycle, FertilityCycleInput, FertilityDetail,
+  FertilityProfileInput, FertilityWorklistRow, SemenAnalysisInput, StimulationMonitoringInput,
   LabResultInput,
   CervicalScreening, CervicalScreeningInput, ColposcopyInput, GynDetail, GynProcedureInput, GynProfileInput,
   GynUltrasoundInput, GynVisitInput, GynWorklistRow, Colposcopy, GynProcedure,
@@ -117,5 +119,17 @@ export interface DataService {
   updateGynProcedure(id: string, patch: Partial<GynProcedure>): Promise<void>;
   recordLabResults(patientId: string, results: LabResultInput[]): Promise<void>;
   recordMenopauseAssessment(patientId: string, a: { assessed_at: string; items: number[]; notes: string | null }): Promise<void>;
+  // --- infertility -----------------------------------------------------------------
+  listFertilityWorklist(clinicId?: string | null): Promise<FertilityWorklistRow[]>;
+  listCryoInventory(clinicId?: string | null): Promise<CryoRow[]>;
+  getFertilityDetail(patientId: string): Promise<FertilityDetail>;
+  saveFertilityProfile(patientId: string, p: FertilityProfileInput): Promise<void>;
+  recordSemenAnalysis(patientId: string, s: SemenAnalysisInput): Promise<void>;
+  createFertilityCycle(patientId: string, c: FertilityCycleInput): Promise<FertilityCycle>;
+  updateFertilityCycle(cycleId: string, patch: Partial<FertilityCycle>): Promise<void>;
+  recordMonitoring(cycleId: string, m: StimulationMonitoringInput): Promise<void>;
+  saveEmbryo(cycleId: string, e: EmbryoInput, embryoId?: string): Promise<void>;
+  recordTransfer(cycleId: string, t: EmbryoTransferInput): Promise<void>;
+  updateTransfer(transferId: string, patch: Partial<EmbryoTransfer>): Promise<void>;
   recordUrogynAssessment(patientId: string, a: { assessed_at: string; frequency: number; amount: number; interference: number; leak_situations: string[]; notes: string | null }): Promise<void>;
 }

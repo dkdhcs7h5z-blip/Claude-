@@ -15,6 +15,8 @@ const PatientDetailPage = lazy(() => import('@/modules/patients/PatientDetailPag
 const PatientFormPage = lazy(() => import('@/modules/patients/PatientFormPage').then((m) => ({ default: m.PatientFormPage })));
 const SpecialtyPage = lazy(() => import('@/modules/specialty/SpecialtyPage').then((m) => ({ default: m.SpecialtyPage })));
 const GynecologyPage = lazy(() => import('@/modules/gynecology/GynecologyPage').then((m) => ({ default: m.GynecologyPage })));
+const InfertilityPage = lazy(() => import('@/modules/infertility/InfertilityPage').then((m) => ({ default: m.InfertilityPage })));
+const CryostoragePage = lazy(() => import('@/modules/infertility/CryostoragePage').then((m) => ({ default: m.CryostoragePage })));
 const ObstetricsPage = lazy(() => import('@/modules/obstetrics/ObstetricsPage').then((m) => ({ default: m.ObstetricsPage })));
 const AntenatalCardPage = lazy(() => import('@/modules/obstetrics/AntenatalCardPage').then((m) => ({ default: m.AntenatalCardPage })));
 const ResearchPage = lazy(() => import('@/modules/research/ResearchPage').then((m) => ({ default: m.ResearchPage })));
@@ -24,7 +26,6 @@ const AuditLogPage = lazy(() => import('@/modules/admin/AuditLogPage').then((m) 
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 
 const specialtyRoutes: Array<{ path: string; specialty: Specialty }> = [
-  { path: 'infertility', specialty: 'infertility' },
   { path: 'fetal-medicine', specialty: 'fetal_medicine' },
 ];
 
@@ -64,6 +65,8 @@ export default function App() {
             <Route path="patients/:id/edit" element={<P perm="patient.update"><PatientFormPage /></P>} />
             <Route path="obstetrics" element={<P perm="clinical.read"><ObstetricsPage /></P>} />
             <Route path="gynecology" element={<P perm="clinical.read"><GynecologyPage /></P>} />
+            <Route path="infertility" element={<P perm="clinical.read"><InfertilityPage /></P>} />
+            <Route path="infertility/cryostorage" element={<P perm="clinical.read"><CryostoragePage /></P>} />
             {specialtyRoutes.map((r) => (
               <Route key={r.path} path={r.path} element={<P perm="clinical.read"><SpecialtyPage specialty={r.specialty} /></P>} />
             ))}

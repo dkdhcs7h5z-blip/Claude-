@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { DataService, AuthUser } from './service';
 import type {
+  CryoRow, Embryo, EmbryoTransfer, FertilityCycle as FC, FertilityProfile, FertilityWorklistRow, SemenAnalysis, StimulationMonitoring,
   LabResult, MenopauseAssessment, UrogynAssessment,
   CervicalScreening, Colposcopy, GynProcedure, GynProfile, GynUltrasound, GynVisitRow, GynWorklistRow,
   FetalBiometry, LabourObservation, PostnatalVisitRow,
@@ -426,5 +427,76 @@ export class SupabaseService implements DataService {
 
   async recordUrogynAssessment(patientId: string, a: Parameters<DataService['recordUrogynAssessment']>[1]) {
     check(await this.sb.from('urogyn_assessments').insert({ ...a, patient_id: patientId, clinic_id: await this.patientClinic(patientId) }));
+  }
+
+  // --- infertility -----------------------------------------------------------------
+  private async cycleRef(cycleId: string) {
+    return check(await this.sb.from('fertility_cycles').select('patient_id, clinic_id').eq('id', cycleId).single()) as { patient_id: string; clinic_id: string };
+  }
+
+  async listFertilityWorklist(clinicId?: string | null) {
+    let q = this.sb.from('fertility_worklist').select('*').limit(500);
+    if (clinicId) q = q.eq('clinic_id', clinicId);
+    return check(await q) as FertilityWorklistRow[];
+  }
+
+  async listCryoInventory(clinicId?: string | null) {
+    let q = this.sb.from('cryo_inventory').select('*').order('frozen_at').limit(2000);
+    if (clinicId) q = q.eq('clinic_id', clinicId);
+    return check(await q) as CryoRow[];
+  }
+
+  async getFertilityDetail(patientId: string) {
+    const [profile, semen, cycles, mon, emb, tr, labs] = await Promise.all([
+      this.sb.from('fertility_profiles').select('*').eq('patient_id', patientId).maybeSingle(),
+      this.sb.from('semen_analyses').select('*').eq('patient_id', patientId).order('collected_at'),
+      this.sb.from('fertility_cycles').select('*').eq('patient_id', patientId).order('start_date'),
+      this.sb.from('stimulation_monitoring').select('*').eq('patient_id', patientId).order('monitored_on'),
+      this.sb.from('embryos').select('*').eq('patient_id', patientId).order('embryo_no'),
+      this.sb.from('embryo_transfers').select('*').eq('patient_id', patientId).order('transfer_on'),
+      this.sb.from('lab_results').select('*').eq('patient_id', patientId).order('collected_at'),
+    ]);
+    return {
+      profile: check(profile) as FertilityProfile | null, semen: check(semen) as SemenAnalysis[], cycles: check(cycles) as FC[],
+      monitoring: check(mon) as StimulationMonitoring[], embryos: check(emb) as Embryo[], transfers: check(tr) as EmbryoTransfer[],
+      labs: check(labs) as LabResult[],
+    };
+  }
+
+  async saveFertilityProfile(patientId: string, p: Parameters<DataService['saveFertilityProfile']>[1]) {
+    check(await this.sb.from('fertility_profiles').upsert({ ...p, patient_id: patientId }, { onConflict: 'patient_id' }));
+  }
+
+  async recordSemenAnalysis(patientId: string, s: Parameters<DataService['recordSemenAnalysis']>[1]) {
+    check(await this.sb.from('semen_analyses').insert({ ...s, patient_id: patientId, clinic_id: await this.patientClinic(patientId) }));
+  }
+
+  async createFertilityCycle(patientId: string, c: Parameters<DataService['createFertilityCycle']>[1]) {
+    return check(await this.sb.from('fertility_cycles').insert({ ...c, patient_id: patientId, clinic_id: await this.patientClinic(patientId, c.clinic_id) })
+      .select('*').single()) as FC;
+  }
+
+  async updateFertilityCycle(cycleId: string, patch: Partial<FC>) {
+    check(await this.sb.from('fertility_cycles').update(patch).eq('id', cycleId));
+  }
+
+  async recordMonitoring(cycleId: string, m: Parameters<DataService['recordMonitoring']>[1]) {
+    const ref = await this.cycleRef(cycleId);
+    check(await this.sb.from('stimulation_monitoring').insert({ ...m, cycle_id: cycleId, ...ref }));
+  }
+
+  async saveEmbryo(cycleId: string, e: Parameters<DataService['saveEmbryo']>[1], embryoId?: string) {
+    if (embryoId) { check(await this.sb.from('embryos').update(e).eq('id', embryoId)); return; }
+    const ref = await this.cycleRef(cycleId);
+    check(await this.sb.from('embryos').insert({ ...e, cycle_id: cycleId, ...ref }));
+  }
+
+  async recordTransfer(cycleId: string, t: Parameters<DataService['recordTransfer']>[1]) {
+    const ref = await this.cycleRef(cycleId);
+    check(await this.sb.from('embryo_transfers').insert({ ...t, cycle_id: cycleId, ...ref }));
+  }
+
+  async updateTransfer(transferId: string, patch: Partial<EmbryoTransfer>) {
+    check(await this.sb.from('embryo_transfers').update(patch).eq('id', transferId));
   }
 }

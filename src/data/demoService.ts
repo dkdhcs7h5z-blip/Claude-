@@ -1,6 +1,7 @@
 import type { DataService, AuthUser } from './service';
 import type {
-  LabResult, MenopauseAssessment, UrogynAssessment,
+  LabResult, MenopauseAssessment, UrogynAssessment, CryoRow, Embryo, EmbryoTransfer, FertilityCycle, FertilityProfile,
+  FertilityWorklistRow, SemenAnalysis, StimulationMonitoring,
   CervicalScreening, Colposcopy, GynDetail, GynProcedure, GynProfile, GynUltrasound, GynVisit, GynVisitRow, GynWorklistRow,
   FetalBiometry, LabourObservation, PostnatalVisit, PostnatalVisitRow,
   AccessGrant, AntenatalVisit, AntenatalVisitRow, AuditEvent, Delivery, DocumentMeta, Encounter, MyAccess, Newborn,
@@ -15,7 +16,7 @@ import {
   DEMO_CLINICS, DEMO_CYCLES, DEMO_DOCUMENTS, DEMO_ENCOUNTERS, DEMO_FETAL, DEMO_GRANTS, DEMO_PATIENTS,
   DEMO_PREGNANCIES, DEMO_RESEARCH, DEMO_RESEARCH_MEMBERS, DEMO_USERS, seedAudit, type DemoUser,
   DEMO_VISITS, DEMO_VISIT_ENCOUNTERS, DEMO_DELIVERIES, DEMO_NEWBORNS,
-  DEMO_LABS, DEMO_MRS, DEMO_ICIQ,
+  DEMO_LABS, DEMO_MRS, DEMO_ICIQ, DEMO_FERTILITY_PROFILES, DEMO_SEMEN, DEMO_MONITORING, DEMO_EMBRYOS, DEMO_TRANSFERS,
   DEMO_GYN_PROFILES, DEMO_GYN_VISITS, DEMO_GYN_ENCOUNTERS, DEMO_GYN_US, DEMO_SCREENINGS, DEMO_COLPOSCOPIES, DEMO_GYN_PROCEDURES,
   DEMO_DELIVERIES_EXTRA, DEMO_SCANS, DEMO_BIOMETRY_SEED, DEMO_POSTNATAL, DEMO_POSTNATAL_ENCOUNTERS, DEMO_LABOUR,
 } from './demoData';
@@ -56,6 +57,11 @@ export class DemoService implements DataService {
   private colposcopies: Colposcopy[] = clone(DEMO_COLPOSCOPIES);
   private gynProcedures: GynProcedure[] = clone(DEMO_GYN_PROCEDURES);
   private labs: LabResult[] = clone(DEMO_LABS);
+  private fertilityProfiles: FertilityProfile[] = clone(DEMO_FERTILITY_PROFILES);
+  private semen: SemenAnalysis[] = clone(DEMO_SEMEN);
+  private monitoring: StimulationMonitoring[] = clone(DEMO_MONITORING);
+  private embryos: Embryo[] = clone(DEMO_EMBRYOS);
+  private transfers: EmbryoTransfer[] = clone(DEMO_TRANSFERS);
   private mrs: MenopauseAssessment[] = clone(DEMO_MRS);
   private iciq: UrogynAssessment[] = clone(DEMO_ICIQ);
   private biometry: FetalBiometry[] = clone(DEMO_BIOMETRY_SEED).map((b) => ({ ...b, efw_g: hadlockEfw(b.hc_mm, b.ac_mm, b.fl_mm) ?? b.efw_g }));
@@ -948,5 +954,177 @@ export class DemoService implements DataService {
     this.iciq.push({ ...a, id: crypto.randomUUID(), patient_id: patientId, clinic_id: this.clinicFor(patientId),
       score: a.frequency + a.amount + a.interference, recorded_by: this.currentId });
     this.log('INSERT', 'urogyn_assessments', patientId);
+  }
+
+  // --- infertility ---------------------------------------------------------------------
+  private tagInfertility(patientId: string) {
+    const pt = this.patients.find((x) => x.id === patientId);
+    if (pt && !pt.specialties.includes('infertility')) pt.specialties = [...pt.specialties, 'infertility'];
+  }
+
+  private cycleOrThrow(cycleId: string, perm: Permission) {
+    const c = this.cycles.find((x) => x.id === cycleId);
+    if (!c) throw new Error('Cycle not found');
+    this.patientOrThrow(c.patient_id, perm);
+    return c;
+  }
+
+  async listFertilityWorklist(clinicId?: string | null): Promise<FertilityWorklistRow[]> {
+    await delay();
+    return this.cycles.flatMap((c) => {
+      const p = this.patients.find((x) => x.id === c.patient_id);
+      if (!p || p.deleted_at || !this.can(p, 'clinical.read') || (clinicId && c.clinic_id !== clinicId)) return [];
+      const m = this.monitoring.filter((x) => x.cycle_id === c.id).sort((a, b) => b.monitored_on.localeCompare(a.monitored_on))[0];
+      const t = this.transfers.filter((x) => x.cycle_id === c.id).sort((a, b) => b.transfer_on.localeCompare(a.transfer_on))[0];
+      if (['completed', 'cancelled'].includes(c.status) && t?.outcome !== 'pending') return [];
+      return [{
+        cycle_id: c.id, patient_id: p.id, clinic_id: c.clinic_id, cycle_type: c.cycle_type, cycle_number: c.cycle_number ?? null, status: c.status,
+        start_date: c.start_date, stim_protocol: c.stim_protocol ?? null, trigger_at: c.trigger_at ?? null, retrieval_at: c.retrieval_at ?? null,
+        oocytes_retrieved: c.oocytes_retrieved ?? null, freeze_all: c.freeze_all ?? false, mrn: p.mrn, first_name_en: p.first_name_en,
+        last_name_en: p.last_name_en, first_name_ar: p.first_name_ar, last_name_ar: p.last_name_ar, date_of_birth: p.date_of_birth,
+        last_monitoring_on: m?.monitored_on ?? null, last_stim_day: m?.stim_day ?? null, last_e2: m?.e2_pmol_l ?? null,
+        last_follicles_right: m?.follicles_right ?? null, last_follicles_left: m?.follicles_left ?? null,
+        last_transfer_on: t?.transfer_on ?? null, last_transfer_day: t?.embryo_day ?? null, last_transfer_outcome: t?.outcome ?? null,
+        last_beta_hcg: t?.beta_hcg_value ?? null,
+      }];
+    });
+  }
+
+  async listCryoInventory(clinicId?: string | null): Promise<CryoRow[]> {
+    await delay();
+    return this.embryos.filter((e) => e.status === 'frozen' && (!clinicId || e.clinic_id === clinicId)).flatMap((e) => {
+      const p = this.patients.find((x) => x.id === e.patient_id);
+      if (!p || p.deleted_at || !this.can(p, 'clinical.read')) return [];
+      const c = this.cycles.find((x) => x.id === e.cycle_id);
+      return [{
+        embryo_id: e.id, patient_id: p.id, clinic_id: e.clinic_id, cycle_id: e.cycle_id, embryo_no: e.embryo_no, day_observed: e.day_observed,
+        stage: e.stage, blast_expansion: e.blast_expansion, icm_grade: e.icm_grade, te_grade: e.te_grade, cell_count: e.cell_count, fragmentation_grade: e.fragmentation_grade,
+        pgt_result: e.pgt_result, frozen_at: e.frozen_at, storage_location: e.storage_location, consent_expires_on: e.consent_expires_on,
+        cycle_number: c?.cycle_number ?? null, mrn: p.mrn, first_name_en: p.first_name_en, last_name_en: p.last_name_en,
+        first_name_ar: p.first_name_ar, last_name_ar: p.last_name_ar,
+      }];
+    });
+  }
+
+  async getFertilityDetail(patientId: string) {
+    await delay(80);
+    const p = this.patients.find((x) => x.id === patientId);
+    if (!p || !this.can(p, 'clinical.read')) return { profile: null, semen: [], cycles: [], monitoring: [], embryos: [], transfers: [], labs: [] };
+    const by = <T extends { patient_id: string }>(a: T[]) => a.filter((x) => x.patient_id === patientId);
+    return clone({
+      profile: this.fertilityProfiles.find((x) => x.patient_id === patientId) ?? null,
+      semen: by(this.semen).sort((a, b) => a.collected_at.localeCompare(b.collected_at)),
+      cycles: by(this.cycles).sort((a, b) => a.start_date.localeCompare(b.start_date)),
+      monitoring: by(this.monitoring).sort((a, b) => a.monitored_on.localeCompare(b.monitored_on)),
+      embryos: by(this.embryos).sort((a, b) => a.embryo_no - b.embryo_no),
+      transfers: by(this.transfers).sort((a, b) => a.transfer_on.localeCompare(b.transfer_on)),
+      labs: by(this.labs).sort((a, b) => a.collected_at.localeCompare(b.collected_at)),
+    });
+  }
+
+  async saveFertilityProfile(patientId: string, prof: Parameters<DataService['saveFertilityProfile']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    if (prof.tubal_method && (prof.tubal_assessment ?? 'not_done') === 'not_done') throw new Error('Tubal method requires a result');
+    const existing = this.fertilityProfiles.find((x) => x.patient_id === patientId);
+    if (existing) Object.assign(existing, prof);
+    else { this.fertilityProfiles.push({ ...prof, patient_id: patientId }); this.tagInfertility(patientId); }
+    this.log(existing ? 'UPDATE' : 'INSERT', 'fertility_profiles', patientId);
+  }
+
+  async recordSemenAnalysis(patientId: string, a: Parameters<DataService['recordSemenAnalysis']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    if (a.collected_at > todayIso()) throw new Error('Collection date cannot be in the future');
+    if (a.progressive_pct != null && a.total_motility_pct != null && a.progressive_pct > a.total_motility_pct) {
+      throw new Error('Progressive motility cannot exceed total motility');
+    }
+    const total = a.volume_ml != null && a.concentration_m_ml != null ? Math.round(a.volume_ml * a.concentration_m_ml * 100) / 100 : null;
+    this.semen.push({ ...a, id: crypto.randomUUID(), patient_id: patientId, clinic_id: this.clinicFor(patientId), total_count_m: total,
+      tmsc_m: total != null && a.progressive_pct != null ? Math.round(total * a.progressive_pct) / 100 : null, recorded_by: this.currentId });
+    this.log('INSERT', 'semen_analyses', patientId);
+  }
+
+  private validateCycle(c: Partial<FertilityCycle>) {
+    if (c.mii_oocytes != null && c.oocytes_retrieved != null && c.mii_oocytes > c.oocytes_retrieved) throw new Error('MII cannot exceed oocytes retrieved');
+    if (c.fertilized_2pn != null && c.oocytes_retrieved != null && c.fertilized_2pn > c.oocytes_retrieved) throw new Error('2PN cannot exceed oocytes retrieved');
+    if (c.freeze_all_reason && !c.freeze_all) throw new Error('Freeze-all reason requires freeze-all');
+    if (c.cancel_reason && c.status !== 'cancelled') throw new Error('Cancel reason requires a cancelled cycle');
+  }
+
+  async createFertilityCycle(patientId: string, c: Parameters<DataService['createFertilityCycle']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    const { clinic_id, ...rest } = c;
+    this.validateCycle(rest);
+    const n = Math.max(0, ...this.cycles.filter((x) => x.patient_id === patientId).map((x) => x.cycle_number ?? 0)) + 1;
+    const cycle: FertilityCycle = { ...rest, id: crypto.randomUUID(), patient_id: patientId, clinic_id: this.clinicFor(patientId, clinic_id), cycle_number: rest.cycle_number ?? n };
+    this.cycles.push(cycle);
+    this.tagInfertility(patientId);
+    this.log('INSERT', 'fertility_cycles', patientId);
+    return clone(cycle);
+  }
+
+  async updateFertilityCycle(cycleId: string, patch: Partial<FertilityCycle>) {
+    await delay();
+    const c = this.cycleOrThrow(cycleId, 'clinical.write');
+    this.validateCycle({ ...c, ...patch });
+    Object.assign(c, patch);
+    this.log('UPDATE', 'fertility_cycles', c.patient_id, { changed_fields: Object.keys(patch) });
+  }
+
+  async recordMonitoring(cycleId: string, m: Parameters<DataService['recordMonitoring']>[1]) {
+    await delay();
+    const c = this.cycleOrThrow(cycleId, 'clinical.write');
+    if (m.monitored_on > todayIso()) throw new Error('Date cannot be in the future');
+    if ([...m.follicles_right, ...m.follicles_left].some((f) => f < 2 || f > 40)) throw new Error('Follicle sizes must be 2–40 mm');
+    this.monitoring.push({ ...m, id: crypto.randomUUID(), cycle_id: cycleId, patient_id: c.patient_id, clinic_id: c.clinic_id, recorded_by: this.currentId });
+    this.log('INSERT', 'stimulation_monitoring', c.patient_id);
+  }
+
+  async saveEmbryo(cycleId: string, e: Parameters<DataService['saveEmbryo']>[1], embryoId?: string) {
+    await delay();
+    const c = this.cycleOrThrow(cycleId, 'clinical.write');
+    if (e.stage !== 'blastocyst' && (e.blast_expansion != null || e.icm_grade || e.te_grade)) throw new Error('Blastocyst grades only apply to blastocysts');
+    if (e.status === 'frozen' && (!e.frozen_at || !e.storage_location)) throw new Error('A frozen embryo needs a freeze date and storage location');
+    if (embryoId) {
+      const ex = this.embryos.find((x) => x.id === embryoId && x.cycle_id === cycleId);
+      if (!ex) throw new Forbidden();
+      Object.assign(ex, e);
+      this.log('UPDATE', 'embryos', c.patient_id, { changed_fields: Object.keys(e) });
+      return;
+    }
+    if (this.embryos.some((x) => x.cycle_id === cycleId && x.embryo_no === e.embryo_no)) throw new Error('Embryo number already used in this cycle');
+    this.embryos.push({ ...e, id: crypto.randomUUID(), cycle_id: cycleId, patient_id: c.patient_id, clinic_id: c.clinic_id });
+    this.log('INSERT', 'embryos', c.patient_id);
+  }
+
+  async recordTransfer(cycleId: string, tr: Parameters<DataService['recordTransfer']>[1]) {
+    await delay();
+    const c = this.cycleOrThrow(cycleId, 'clinical.write');
+    if (tr.transfer_on > todayIso()) throw new Error('Transfer date cannot be in the future');
+    if (tr.embryo_ids.length && tr.embryo_ids.length !== tr.embryos_transferred) throw new Error('Embryo count must match the selected embryos');
+    const bad = tr.embryo_ids.some((id) => {
+      const e = this.embryos.find((x) => x.id === id);
+      return !e || e.patient_id !== c.patient_id || !['in_culture', 'frozen', 'thawed'].includes(e.status);
+    });
+    if (bad) throw new Error('Transferred embryos must be this patient’s available embryos');
+    this.transfers.push({ ...tr, id: crypto.randomUUID(), cycle_id: cycleId, patient_id: c.patient_id, clinic_id: c.clinic_id, recorded_by: this.currentId,
+      beta_hcg_on: null, beta_hcg_value: null, gestational_sacs: null, fetal_hearts: null, outcome: 'pending', pregnancy_id: null });
+    this.embryos.filter((e) => tr.embryo_ids.includes(e.id)).forEach((e) => { e.status = 'transferred'; });
+    this.log('INSERT', 'embryo_transfers', c.patient_id);
+  }
+
+  async updateTransfer(transferId: string, patch: Partial<EmbryoTransfer>) {
+    await delay();
+    const t = this.transfers.find((x) => x.id === transferId);
+    if (!t) throw new Forbidden();
+    this.patientOrThrow(t.patient_id, 'clinical.write');
+    const next = { ...t, ...patch };
+    if (next.fetal_hearts != null && next.gestational_sacs != null && next.fetal_hearts > next.gestational_sacs) throw new Error('Fetal hearts cannot exceed sacs');
+    if (['clinical', 'ongoing'].includes(next.outcome) && !(next.gestational_sacs && next.gestational_sacs >= 1)) throw new Error('A clinical pregnancy requires a gestational sac');
+    if (next.beta_hcg_on && next.beta_hcg_on <= next.transfer_on) throw new Error('β-hCG date must follow the transfer');
+    Object.assign(t, patch);
+    this.log('UPDATE', 'embryo_transfers', t.patient_id, { changed_fields: Object.keys(patch) });
   }
 }

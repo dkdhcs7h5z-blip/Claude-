@@ -100,6 +100,17 @@ export function LineChart({ title, series, xDomain, yDomain, refLines = [], band
     return `M${top.join('L')}L${bot.join('L')}Z`;
   })();
 
+  // end-of-line labels: nudge apart so converging series stay legible (≥ 11px)
+  const endLabelY = new Map<string, number>();
+  if (series.length >= 2) {
+    const ends = series.flatMap((s) => {
+      const last = [...s.points].sort((a, b) => a.x - b.x).at(-1);
+      return last ? [{ key: s.key, y: sy(last.y) }] : [];
+    }).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 11) ends[i].y = ends[i - 1].y + 11;
+    ends.forEach((e) => endLabelY.set(e.key, e.y));
+  }
+
   const hoverValues = hoverX == null ? [] : series
     .map((s) => ({ s, p: s.points.find((p) => p.x === hoverX) }))
     .filter((v): v is { s: ChartSeries; p: { x: number; y: number } } => !!v.p);
@@ -180,7 +191,7 @@ export function LineChart({ title, series, xDomain, yDomain, refLines = [], band
                     <circle key={p.x} cx={sx(p.x)} cy={sy(p.y)} r={hoverX === p.x ? 5 : 4} fill={s.color} stroke="#fff" strokeWidth={2} />
                   ))}
                   {series.length >= 2 && last && (
-                    <text x={sx(last.x) + 8} y={sy(last.y)} dy="0.32em" className="fill-slate-600 text-[10px] font-medium">{s.label}</text>
+                    <text x={sx(last.x) + 8} y={endLabelY.get(s.key) ?? sy(last.y)} dy="0.32em" className="fill-slate-600 text-[10px] font-medium">{s.label}</text>
                   )}
                 </g>
               );
