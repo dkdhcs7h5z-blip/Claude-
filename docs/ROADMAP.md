@@ -7,7 +7,8 @@ Authentication · per-clinic RBAC with hybrid patient-level access · relational
 - **Obstetrics ✅ (first iteration):** dating with LMP/US reconciliation and IVF dating · antenatal flow sheet with sign workflow · BP/weight/SFH trends · pre-eclampsia (aspirin) and GDM risk assessment · visit alerts · care schedule · labour & delivery with newborns · pregnancy loss · antenatal worklist. See [OBSTETRICS.md](OBSTETRICS.md).
 - **Obstetrics ✅ (second iteration):** high-risk assessment per the clinic card (past vs ongoing factors, suggested level, detection from records, plan & medications) · fetal biometry with Hadlock EFW and centile chart · per-fetus data & chorionicity for multiples · structured postnatal visits with EPDS · partogram · printable bilingual antenatal card.
   *Next:* per-clinic schedule configuration, CTG/NST & BPP, structured lab results.
-- **Gynecology:** structured history/exam, cervical screening & colposcopy, AUB work-up, operative notes, menopause.
+- **Gynecology ✅:** structured history · visits with PALM-COEIN, POP-Q and hyperandrogenism · cervical screening with next-step support and status tracking · colposcopy & histology · pelvic ultrasound with FIGO fibroids and IOTA Simple Rules · PMB / AUB ≥ 45 / PCOS decision support · procedures with Clavien-Dindo and histology tracking · worklist. See [GYNECOLOGY.md](GYNECOLOGY.md).
+  *Next:* menopause symptom scores, O-RADS, urogynecology questionnaires, hormone lab results.
 - **Infertility & IVF:** couple records (partner as linked person), stimulation monitoring charts, oocyte retrieval, embryology lab, transfer, cryostorage inventory with chain of custody.
 - **Fetal medicine:** first-trimester combined screening, anomaly scan reporting, growth/Doppler surveillance with centile charts, invasive procedures, multiple pregnancy, fetal therapy.
 - Encounter editor with sign/amend workflow UI.

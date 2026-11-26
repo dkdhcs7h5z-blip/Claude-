@@ -40,7 +40,7 @@ export function Card({ title, actions, children, className, bodyClassName }: {
   return (
     <section className={clsx('card', className)}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-slate-100 px-4 py-3 sm:px-5">
           <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
           {actions}
         </header>

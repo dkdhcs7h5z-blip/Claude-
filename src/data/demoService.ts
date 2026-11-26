@@ -1,5 +1,6 @@
 import type { DataService, AuthUser } from './service';
 import type {
+  CervicalScreening, Colposcopy, GynDetail, GynProcedure, GynProfile, GynUltrasound, GynVisit, GynVisitRow, GynWorklistRow,
   FetalBiometry, LabourObservation, PostnatalVisit, PostnatalVisitRow,
   AccessGrant, AntenatalVisit, AntenatalVisitRow, AuditEvent, Delivery, DocumentMeta, Encounter, MyAccess, Newborn,
   ObstetricWorklistRow, Patient, PatientInput, Pregnancy, Profile, StaffMember,
@@ -13,6 +14,7 @@ import {
   DEMO_CLINICS, DEMO_CYCLES, DEMO_DOCUMENTS, DEMO_ENCOUNTERS, DEMO_FETAL, DEMO_GRANTS, DEMO_PATIENTS,
   DEMO_PREGNANCIES, DEMO_RESEARCH, DEMO_RESEARCH_MEMBERS, DEMO_USERS, seedAudit, type DemoUser,
   DEMO_VISITS, DEMO_VISIT_ENCOUNTERS, DEMO_DELIVERIES, DEMO_NEWBORNS,
+  DEMO_GYN_PROFILES, DEMO_GYN_VISITS, DEMO_GYN_ENCOUNTERS, DEMO_GYN_US, DEMO_SCREENINGS, DEMO_COLPOSCOPIES, DEMO_GYN_PROCEDURES,
   DEMO_DELIVERIES_EXTRA, DEMO_SCANS, DEMO_BIOMETRY_SEED, DEMO_POSTNATAL, DEMO_POSTNATAL_ENCOUNTERS, DEMO_LABOUR,
 } from './demoData';
 import { buildStoragePath, MAX_UPLOAD_BYTES } from '@/lib/files';
@@ -44,7 +46,13 @@ export class DemoService implements DataService {
   private pregnancies = clone(DEMO_PREGNANCIES);
   private cycles = clone(DEMO_CYCLES);
   private fetal = clone([...DEMO_FETAL, ...DEMO_SCANS]);
-  private encounters: Encounter[] = clone([...DEMO_ENCOUNTERS, ...DEMO_VISIT_ENCOUNTERS, ...DEMO_POSTNATAL_ENCOUNTERS]);
+  private encounters: Encounter[] = clone([...DEMO_ENCOUNTERS, ...DEMO_VISIT_ENCOUNTERS, ...DEMO_POSTNATAL_ENCOUNTERS, ...DEMO_GYN_ENCOUNTERS]);
+  private gynProfiles: GynProfile[] = clone(DEMO_GYN_PROFILES);
+  private gynVisits: GynVisit[] = clone(DEMO_GYN_VISITS);
+  private gynUs: GynUltrasound[] = clone(DEMO_GYN_US);
+  private screenings: CervicalScreening[] = clone(DEMO_SCREENINGS);
+  private colposcopies: Colposcopy[] = clone(DEMO_COLPOSCOPIES);
+  private gynProcedures: GynProcedure[] = clone(DEMO_GYN_PROCEDURES);
   private biometry: FetalBiometry[] = clone(DEMO_BIOMETRY_SEED).map((b) => ({ ...b, efw_g: hadlockEfw(b.hc_mm, b.ac_mm, b.fl_mm) ?? b.efw_g }));
   private postnatal: PostnatalVisit[] = clone(DEMO_POSTNATAL);
   private labour: LabourObservation[] = clone(DEMO_LABOUR);
@@ -52,7 +60,7 @@ export class DemoService implements DataService {
   private deliveries: Delivery[] = clone([...DEMO_DELIVERIES, ...DEMO_DELIVERIES_EXTRA]);
   private newborns: Newborn[] = clone(DEMO_NEWBORNS);
   private signatures = new Map<string, { by: string; at: string }>(
-    [...DEMO_VISIT_ENCOUNTERS, ...DEMO_POSTNATAL_ENCOUNTERS].filter((e) => e.status === 'signed').map((e) => [e.id, { by: e.provider_id, at: e.encounter_at }]),
+    [...DEMO_ENCOUNTERS, ...DEMO_VISIT_ENCOUNTERS, ...DEMO_POSTNATAL_ENCOUNTERS, ...DEMO_GYN_ENCOUNTERS].filter((e) => e.status === 'signed').map((e) => [e.id, { by: e.provider_id, at: e.encounter_at }]),
   );
   private documents: DocumentMeta[] = clone(DEMO_DOCUMENTS);
   private grants: AccessGrant[] = clone(DEMO_GRANTS);
@@ -705,5 +713,195 @@ export class DemoService implements DataService {
     this.patientOrThrow(o.patient_id, 'clinical.write');
     o.entered_in_error = true;
     this.log('UPDATE', 'labour_observations', o.patient_id, { changed_fields: ['entered_in_error'] });
+  }
+
+  // --- gynecology ---------------------------------------------------------------------
+  private tagGyn(patientId: string) {
+    const pt = this.patients.find((x) => x.id === patientId);
+    if (pt && !pt.specialties.includes('gynecology')) pt.specialties = [...pt.specialties, 'gynecology'];
+  }
+
+  private clinicFor(patientId: string, override?: string | null) {
+    const clinicId = override || this.patients.find((x) => x.id === patientId)!.clinic_id;
+    this.assertMember(clinicId);
+    return clinicId;
+  }
+
+  async listGynWorklist(clinicId?: string | null): Promise<GynWorklistRow[]> {
+    await delay();
+    return this.patients
+      .filter((p) => !p.deleted_at && p.specialties.includes('gynecology') && (!clinicId || p.clinic_id === clinicId) && this.can(p, 'clinical.read'))
+      .map((p) => {
+        const prof = this.gynProfiles.find((g) => g.patient_id === p.id);
+        const s = this.screenings.filter((x) => x.patient_id === p.id).sort((a, b) => b.sample_date.localeCompare(a.sample_date))[0];
+        const visits = this.gynVisits.filter((v) => v.patient_id === p.id).sort((a, b) => b.visit_date.localeCompare(a.visit_date));
+        const colpo = this.colposcopies.filter((c) => c.patient_id === p.id).map((c) => c.performed_at).sort().at(-1) ?? null;
+        return {
+          patient_id: p.id, clinic_id: p.clinic_id, mrn: p.mrn, first_name_en: p.first_name_en, last_name_en: p.last_name_en,
+          first_name_ar: p.first_name_ar, last_name_ar: p.last_name_ar, date_of_birth: p.date_of_birth,
+          menopause_status: prof?.menopause_status ?? null, hysterectomy: prof?.hysterectomy ?? null,
+          last_screening_date: s?.sample_date ?? null, last_screening_test: s?.test_type ?? null, last_hpv_result: s?.hpv_result ?? null,
+          last_cytology_result: s?.cytology_result ?? null, last_screening_status: s?.status ?? null, screening_next_due: s?.next_due_date ?? null,
+          screening_recommendation: s?.recommendation ?? null, last_colposcopy_date: colpo,
+          pending_histology: this.gynProcedures.filter((x) => x.patient_id === p.id && x.histology_status === 'pending').length
+            + this.colposcopies.filter((c) => c.patient_id === p.id && c.histology === 'pending').length,
+          last_visit_date: visits[0]?.visit_date ?? null, last_complaints: visits[0]?.complaints ?? null,
+        };
+      });
+  }
+
+  async getGynDetail(patientId: string): Promise<GynDetail> {
+    await delay(80);
+    const p = this.patients.find((x) => x.id === patientId);
+    if (!p || !this.can(p, 'clinical.read')) return { profile: null, visits: [], ultrasounds: [], screenings: [], colposcopies: [], procedures: [] };
+    const visits: GynVisitRow[] = this.gynVisits.filter((v) => v.patient_id === patientId)
+      .map((v) => ({ v, e: this.encounters.find((e) => e.id === v.encounter_id)! }))
+      .filter(({ e }) => this.encounterVisible(e))
+      .sort((a, b) => a.v.visit_date.localeCompare(b.v.visit_date))
+      .map(({ v, e }) => ({ ...v, encounter: {
+        id: e.id, status: e.status, provider_id: e.provider_id, is_private: e.is_private, assessment: e.assessment, plan: e.plan,
+        chief_complaint: e.chief_complaint, signed_by: this.signatures.get(e.id)?.by ?? null, signed_at: this.signatures.get(e.id)?.at ?? null,
+      } }));
+    const by = <T extends { patient_id: string }>(arr: T[]) => arr.filter((x) => x.patient_id === patientId);
+    return clone({
+      profile: this.gynProfiles.find((g) => g.patient_id === patientId) ?? null,
+      visits,
+      ultrasounds: by(this.gynUs).sort((a, b) => a.performed_at.localeCompare(b.performed_at)),
+      screenings: by(this.screenings).sort((a, b) => a.sample_date.localeCompare(b.sample_date)),
+      colposcopies: by(this.colposcopies).sort((a, b) => a.performed_at.localeCompare(b.performed_at)),
+      procedures: by(this.gynProcedures).sort((a, b) => a.performed_at.localeCompare(b.performed_at)),
+    });
+  }
+
+  async saveGynProfile(patientId: string, profile: Parameters<DataService['saveGynProfile']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    if (profile.menopause_age != null && !['postmenopausal', 'surgical'].includes(profile.menopause_status ?? '')) {
+      throw new Error('Menopause age requires a postmenopausal status');
+    }
+    const existing = this.gynProfiles.find((g) => g.patient_id === patientId);
+    if (existing) Object.assign(existing, profile);
+    else { this.gynProfiles.push({ ...profile, patient_id: patientId }); this.tagGyn(patientId); }
+    this.log(existing ? 'UPDATE' : 'INSERT', 'gyn_profiles', patientId);
+  }
+
+  async recordGynVisit(patientId: string, visit: Parameters<DataService['recordGynVisit']>[1], narrative: Parameters<DataService['recordGynVisit']>[2]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    const date = visit.visit_date || todayIso();
+    if (date > todayIso()) throw new Error('Visit date cannot be in the future');
+    if (visit.lmp && visit.lmp > date) throw new Error('LMP cannot be after the visit');
+    if ((visit.bp_systolic == null) !== (visit.bp_diastolic == null)) throw new Error('Enter both systolic and diastolic pressure');
+    const clinicId = this.clinicFor(patientId, narrative.clinic_id);
+    const encId = crypto.randomUUID();
+    this.encounters.push({
+      id: encId, patient_id: patientId, clinic_id: clinicId, specialty: 'gynecology', encounter_type: 'consultation',
+      encounter_at: date === todayIso() ? nowIso() : `${date}T00:00:00.000Z`, provider_id: this.currentId!, is_private: narrative.is_private ?? false,
+      status: 'draft', chief_complaint: narrative.chief_complaint ?? null, assessment: narrative.assessment ?? null, plan: narrative.plan ?? null,
+    });
+    const id = crypto.randomUUID();
+    this.gynVisits.push({
+      complaints: [], palm_coein: [], lmp: null, pain_score: null, bp_systolic: null, bp_diastolic: null, weight_kg: null, height_cm: null,
+      clinical_hyperandrogenism: null, biochemical_hyperandrogenism: null, abdominal_exam: null, speculum_exam: null, bimanual_exam: null,
+      uterus_size: null, adnexal_tenderness: null, cervical_motion_tenderness: null, pop_stage: null, diagnosis: null, notes: null,
+      ...visit, id, patient_id: patientId, clinic_id: clinicId, encounter_id: encId, visit_date: date, created_by: this.currentId, created_at: nowIso(),
+    });
+    this.tagGyn(patientId);
+    this.log('INSERT', 'gyn_visits', patientId);
+    return id;
+  }
+
+  async updateGynVisit(visitId: string, encounterId: string, visit: Parameters<DataService['updateGynVisit']>[2], narrative: Parameters<DataService['updateGynVisit']>[3]) {
+    await delay();
+    const v = this.gynVisits.find((x) => x.id === visitId);
+    const e = this.encounters.find((x) => x.id === encounterId);
+    if (!v || !e || v.encounter_id !== e.id) throw new Forbidden();
+    this.patientOrThrow(v.patient_id, 'clinical.write');
+    if (e.is_private && e.provider_id !== this.currentId) throw new Forbidden();
+    if (e.status !== 'draft') throw new Error('This visit is signed; record an amendment instead');
+    Object.assign(v, visit);
+    Object.assign(e, { assessment: narrative.assessment ?? e.assessment, plan: narrative.plan ?? e.plan, chief_complaint: narrative.chief_complaint ?? e.chief_complaint });
+    this.log('UPDATE', 'gyn_visits', v.patient_id, { changed_fields: Object.keys(visit) });
+  }
+
+  async recordGynUltrasound(patientId: string, u: Parameters<DataService['recordGynUltrasound']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    if (!u.adnexal_mass && (u.iota_b_features.length || u.iota_m_features.length)) throw new Error('IOTA features require an adnexal mass');
+    const { clinic_id, ...rest } = u;
+    this.gynUs.push({ ...rest, id: crypto.randomUUID(), patient_id: patientId, clinic_id: this.clinicFor(patientId, clinic_id), performed_by: this.currentId });
+    this.log('INSERT', 'gyn_ultrasounds', patientId);
+  }
+
+  private validateScreening(s: Omit<CervicalScreening, 'id' | 'patient_id' | 'clinic_id' | 'recorded_by' | 'created_at'>) {
+    if (s.sample_date > todayIso()) throw new Error('Sample date cannot be in the future');
+    if (s.status === 'resulted') {
+      const ok = (s.test_type === 'cytology' && s.cytology_result) || (s.test_type === 'hpv_primary' && s.hpv_result)
+        || (s.test_type === 'cotest' && s.cytology_result && s.hpv_result);
+      if (!ok) throw new Error('The result must match the test type');
+    }
+    if (s.next_due_date && s.next_due_date <= s.sample_date) throw new Error('Next due date must follow the sample');
+  }
+
+  async recordScreening(patientId: string, s: Parameters<DataService['recordScreening']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    const { clinic_id, ...rest } = s;
+    this.validateScreening(rest);
+    this.screenings.push({ ...rest, id: crypto.randomUUID(), patient_id: patientId, clinic_id: this.clinicFor(patientId, clinic_id), recorded_by: this.currentId, created_at: nowIso() });
+    this.tagGyn(patientId);
+    this.log('INSERT', 'cervical_screenings', patientId);
+  }
+
+  async updateScreening(id: string, patch: Partial<CervicalScreening>) {
+    await delay();
+    const s = this.screenings.find((x) => x.id === id);
+    if (!s) throw new Forbidden();
+    this.patientOrThrow(s.patient_id, 'clinical.write');
+    const next = { ...s, ...patch };
+    this.validateScreening(next);
+    Object.assign(s, patch);
+    this.log('UPDATE', 'cervical_screenings', s.patient_id, { changed_fields: Object.keys(patch) });
+  }
+
+  async recordColposcopy(patientId: string, c: Parameters<DataService['recordColposcopy']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    if (c.histology && !c.biopsy_taken && !['lletz', 'cone'].includes(c.treatment ?? '')) throw new Error('Histology requires a biopsy or excision');
+    if (c.screening_id && !this.screenings.some((s) => s.id === c.screening_id && s.patient_id === patientId)) throw new Forbidden();
+    const { clinic_id, ...rest } = c;
+    this.colposcopies.push({ ...rest, id: crypto.randomUUID(), patient_id: patientId, clinic_id: this.clinicFor(patientId, clinic_id), performed_by: this.currentId });
+    this.log('INSERT', 'colposcopies', patientId);
+  }
+
+  async updateColposcopy(id: string, patch: Partial<Colposcopy>) {
+    const c = this.colposcopies.find((x) => x.id === id);
+    if (!c) throw new Forbidden();
+    this.patientOrThrow(c.patient_id, 'clinical.write');
+    Object.assign(c, patch);
+    this.log('UPDATE', 'colposcopies', c.patient_id, { changed_fields: Object.keys(patch) });
+  }
+
+  async recordGynProcedure(patientId: string, p: Parameters<DataService['recordGynProcedure']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    if (p.performed_at > todayIso()) throw new Error('Procedure date cannot be in the future');
+    if (p.histology_result && p.histology_status !== 'received') throw new Error('Histology result requires status received');
+    const { clinic_id, ...rest } = p;
+    this.gynProcedures.push({ ...rest, surgeon_id: rest.surgeon_id ?? this.currentId, id: crypto.randomUUID(), patient_id: patientId,
+      clinic_id: this.clinicFor(patientId, clinic_id), recorded_by: this.currentId });
+    this.tagGyn(patientId);
+    this.log('INSERT', 'gyn_procedures', patientId);
+  }
+
+  async updateGynProcedure(id: string, patch: Partial<GynProcedure>) {
+    await delay();
+    const p = this.gynProcedures.find((x) => x.id === id);
+    if (!p) throw new Forbidden();
+    this.patientOrThrow(p.patient_id, 'clinical.write');
+    const next = { ...p, ...patch };
+    if (next.histology_result && next.histology_status !== 'received') throw new Error('Histology result requires status received');
+    Object.assign(p, patch);
+    this.log('UPDATE', 'gyn_procedures', p.patient_id, { changed_fields: Object.keys(patch) });
   }
 }

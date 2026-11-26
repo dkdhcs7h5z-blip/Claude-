@@ -1,3 +1,4 @@
+import gynEn from './gyn.en';
 import obEn from './ob.en';
 const en = {
   app: {
@@ -206,6 +207,7 @@ const en = {
   },
   pwa: { updateAvailable: 'A new version is available.', reload: 'Reload' },
   ob: obEn,
+  gyn: gynEn,
 };
 
 export default en;

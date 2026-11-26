@@ -116,7 +116,11 @@ export type AlertCode =
   | 'pn_severe_hypertension' | 'pn_hypertension' | 'epds_self_harm' | 'pn_fever' | 'pn_heavy_lochia' | 'pn_endometritis'
   | 'pn_subinvolution' | 'pn_wound' | 'pn_mastitis' | 'epds_probable' | 'epds_possible' | 'pn_anemia'
   // labour
-  | 'partogram_action' | 'partogram_alert' | 'thick_meconium' | 'tachysystole' | 'intrapartum_fever';
+  | 'partogram_action' | 'partogram_alert' | 'thick_meconium' | 'tachysystole' | 'intrapartum_fever'
+  // gynecology
+  | 'pmb_thick_endometrium' | 'pmb_thin_endometrium' | 'pmb_needs_assessment' | 'asymptomatic_thick_endometrium'
+  | 'aub_45_sampling' | 'postcoital_bleeding' | 'iota_malignant' | 'iota_inconclusive' | 'screening_action'
+  | 'screening_overdue' | 'histology_pending' | 'pcos_criteria' | 'prolapse_stage' | 'severe_pain' | 'gyn_hypertension';
 
 export interface ClinicalAlert {
   code: AlertCode;

@@ -40,6 +40,7 @@
 | Patients | `patients` (bilingual names, demographics, visibility, consent, soft delete) |
 | Clinical core | `encounters` (all specialties; draft → signed → amended), `pregnancies`, `fertility_cycles`, `fetal_assessments` |
 | Obstetrics | `pregnancies` (dating, booking, high-risk plan), `antenatal_visits` (1:1 with an encounter), `fetal_biometry`, `labour_observations`, `deliveries`, `newborns`, `postnatal_visits`; view `obstetric_worklist` |
+| Gynecology | `gyn_profiles`, `gyn_visits` (1:1 with an encounter), `gyn_ultrasounds`, `cervical_screenings`, `colposcopies`, `gyn_procedures`; view `gyn_worklist` |
 | Documents | `documents` (metadata, SHA-256, private flag) + storage bucket |
 | Research | `research_projects` (IRB), `research_project_members`, `research_enrollments` (pseudonymous subject codes) |
 | Accountability | `audit_log` (append-only) |
@@ -56,6 +57,7 @@ Specialty-specific structured data that is still evolving lives in `jsonb` colum
 | `…0004_authorization_rls.sql` | helper functions, integrity triggers, RLS policies |
 | `…0005_audit_and_rpc.sql` | audit log + triggers; RPCs `get_my_access`, `dashboard_stats`, `log_access_event`, `request_emergency_access`, `research_cohort` |
 | `…0006_storage.sql` | private bucket and object policies |
+| `…0009_gynecology.sql` | gynecology tables, RLS, audit, RPC `record_gyn_visit`, `gyn_worklist` view |
 | `…0008_obstetrics_extended.sql` | fetal biometry & EFW, multiples, postnatal visits, labour observations, high-risk fields; RPCs `record_fetal_scan`, `record_postnatal_visit` |
 | `…0007_obstetrics.sql` | dating fields, antenatal visits, deliveries, newborns, worklist view; RPCs `record_antenatal_visit`, `record_delivery` |
 

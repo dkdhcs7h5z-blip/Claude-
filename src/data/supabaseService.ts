@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { DataService, AuthUser } from './service';
 import type {
+  CervicalScreening, Colposcopy, GynProcedure, GynProfile, GynUltrasound, GynVisitRow, GynWorklistRow,
   FetalBiometry, LabourObservation, PostnatalVisitRow,
   AntenatalVisitRow, Delivery, FetalAssessment, Newborn, ObstetricWorklistRow, Pregnancy,
   AccessGrant, AuditEvent, Clinic, DashboardStats, DocumentMeta, MyAccess, Patient,
@@ -330,5 +331,80 @@ export class SupabaseService implements DataService {
 
   async markLabourObservationError(id: string) {
     check(await this.sb.from('labour_observations').update({ entered_in_error: true }).eq('id', id));
+  }
+
+  // --- gynecology -------------------------------------------------------------------
+  private async patientClinic(patientId: string, override?: string | null) {
+    if (override) return override;
+    const p = check(await this.sb.from('patients').select('clinic_id').eq('id', patientId).single()) as { clinic_id: string };
+    return p.clinic_id;
+  }
+
+  async listGynWorklist(clinicId?: string | null) {
+    let q = this.sb.from('gyn_worklist').select('*').limit(500);
+    if (clinicId) q = q.eq('clinic_id', clinicId);
+    return check(await q) as GynWorklistRow[];
+  }
+
+  async getGynDetail(patientId: string) {
+    const [profile, visits, us, scr, colpo, proc] = await Promise.all([
+      this.sb.from('gyn_profiles').select('*').eq('patient_id', patientId).maybeSingle(),
+      this.sb.from('gyn_visits').select('*, encounter:encounters!gyn_visits_encounter_id_fkey(id, status, provider_id, is_private, assessment, plan, chief_complaint, signed_by, signed_at)')
+        .eq('patient_id', patientId).order('visit_date'),
+      this.sb.from('gyn_ultrasounds').select('*').eq('patient_id', patientId).order('performed_at'),
+      this.sb.from('cervical_screenings').select('*').eq('patient_id', patientId).order('sample_date'),
+      this.sb.from('colposcopies').select('*').eq('patient_id', patientId).order('performed_at'),
+      this.sb.from('gyn_procedures').select('*').eq('patient_id', patientId).order('performed_at'),
+    ]);
+    return {
+      profile: check(profile) as GynProfile | null,
+      visits: check(visits) as GynVisitRow[],
+      ultrasounds: check(us) as GynUltrasound[],
+      screenings: check(scr) as CervicalScreening[],
+      colposcopies: check(colpo) as Colposcopy[],
+      procedures: check(proc) as GynProcedure[],
+    };
+  }
+
+  async saveGynProfile(patientId: string, profile: Parameters<DataService['saveGynProfile']>[1]) {
+    check(await this.sb.from('gyn_profiles').upsert({ ...profile, patient_id: patientId }, { onConflict: 'patient_id' }));
+  }
+
+  async recordGynVisit(patientId: string, visit: Parameters<DataService['recordGynVisit']>[1], narrative: Parameters<DataService['recordGynVisit']>[2]) {
+    return check(await this.sb.rpc('record_gyn_visit', { p_patient_id: patientId, p_visit: visit, p_encounter: narrative })) as string;
+  }
+
+  async updateGynVisit(visitId: string, encounterId: string, visit: Parameters<DataService['updateGynVisit']>[2], narrative: Parameters<DataService['updateGynVisit']>[3]) {
+    const { is_private: _p, clinic_id: _c, ...text } = narrative;
+    check(await this.sb.from('encounters').update(text).eq('id', encounterId));
+    check(await this.sb.from('gyn_visits').update(visit).eq('id', visitId));
+  }
+
+  async recordGynUltrasound(patientId: string, us: Parameters<DataService['recordGynUltrasound']>[1]) {
+    check(await this.sb.from('gyn_ultrasounds').insert({ ...us, patient_id: patientId, clinic_id: await this.patientClinic(patientId, us.clinic_id) }));
+  }
+
+  async recordScreening(patientId: string, s: Parameters<DataService['recordScreening']>[1]) {
+    check(await this.sb.from('cervical_screenings').insert({ ...s, patient_id: patientId, clinic_id: await this.patientClinic(patientId, s.clinic_id) }));
+  }
+
+  async updateScreening(id: string, patch: Partial<CervicalScreening>) {
+    check(await this.sb.from('cervical_screenings').update(patch).eq('id', id));
+  }
+
+  async recordColposcopy(patientId: string, c: Parameters<DataService['recordColposcopy']>[1]) {
+    check(await this.sb.from('colposcopies').insert({ ...c, patient_id: patientId, clinic_id: await this.patientClinic(patientId, c.clinic_id) }));
+  }
+
+  async updateColposcopy(id: string, patch: Partial<Colposcopy>) {
+    check(await this.sb.from('colposcopies').update(patch).eq('id', id));
+  }
+
+  async recordGynProcedure(patientId: string, p: Parameters<DataService['recordGynProcedure']>[1]) {
+    check(await this.sb.from('gyn_procedures').insert({ ...p, patient_id: patientId, clinic_id: await this.patientClinic(patientId, p.clinic_id) }));
+  }
+
+  async updateGynProcedure(id: string, patch: Partial<GynProcedure>) {
+    check(await this.sb.from('gyn_procedures').update(patch).eq('id', id));
   }
 }

@@ -1,5 +1,6 @@
 import type { Translation } from './en';
 import obAr from './ob.ar';
+import gynAr from './gyn.ar';
 
 
 const ar: Translation = {
@@ -209,6 +210,7 @@ const ar: Translation = {
   },
   pwa: { updateAvailable: 'يتوفر إصدار جديد.', reload: 'تحديث' },
   ob: obAr,
+  gyn: gynAr,
 };
 
 export default ar;

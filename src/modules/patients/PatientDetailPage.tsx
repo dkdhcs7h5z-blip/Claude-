@@ -15,6 +15,7 @@ import { clinicName, formatDate, patientName, profileName } from '@/lib/format';
 import { useClinics, useLang, useProfiles } from '@/lib/queries';
 import { CyclesPanel, EncountersPanel, FetalPanel, PregnancyCard } from './ClinicalPanels';
 import { ObstetricsTab } from '@/modules/obstetrics/ObstetricsTab';
+import { GynecologyTab } from '@/modules/gynecology/GynecologyTab';
 import { DocumentsTab } from './DocumentsTab';
 import { EmergencyAccessButton, SharingTab } from './SharingTab';
 import { AuditTable } from '@/modules/admin/AuditTable';
@@ -175,7 +176,7 @@ export function PatientDetailPage() {
       )}
 
       {tab === 'obstetrics' && c && <ObstetricsTab patient={p} clinical={c} canWrite={allowed('clinical.write')} />}
-      {tab === 'gynecology' && c && <EncountersPanel items={bySpecialty('gynecology')} />}
+      {tab === 'gynecology' && c && <GynecologyTab patient={p} canWrite={allowed('clinical.write')} />}
       {tab === 'infertility' && c && (<div className="space-y-5"><CyclesPanel items={c.fertility_cycles} /><EncountersPanel items={bySpecialty('infertility')} /></div>)}
       {tab === 'fetal_medicine' && c && (<div className="space-y-5"><FetalPanel items={c.fetal_assessments} /><EncountersPanel items={bySpecialty('fetal_medicine')} /></div>)}
       {tab === 'documents' && <DocumentsTab patient={p} canUpload={allowed('document.upload')} canArchive={allowed('document.delete')} />}

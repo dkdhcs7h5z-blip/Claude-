@@ -1,4 +1,6 @@
 import type {
+  CervicalScreening, CervicalScreeningInput, ColposcopyInput, GynDetail, GynProcedureInput, GynProfileInput,
+  GynUltrasoundInput, GynVisitInput, GynWorklistRow, Colposcopy, GynProcedure,
   FetalBiometryInput, FetalScanInput, LabourObservationInput, PostnatalVisitInput,
   AntenatalVisitInput, DeliveryInput, EncounterNarrative, NewbornInput, ObstetricWorklistRow, Pregnancy,
   PregnancyDetail, PregnancyInput,
@@ -98,4 +100,18 @@ export interface DataService {
   addLabourObservation(pregnancyId: string, obs: LabourObservationInput): Promise<void>;
   /** Labour observations are append-only; errors are flagged, never edited. */
   markLabourObservationError(id: string): Promise<void>;
+
+  // --- gynecology ---------------------------------------------------------------
+  listGynWorklist(clinicId?: string | null): Promise<GynWorklistRow[]>;
+  getGynDetail(patientId: string): Promise<GynDetail>;
+  saveGynProfile(patientId: string, profile: GynProfileInput): Promise<void>;
+  recordGynVisit(patientId: string, visit: GynVisitInput, narrative: EncounterNarrative): Promise<string>;
+  updateGynVisit(visitId: string, encounterId: string, visit: GynVisitInput, narrative: EncounterNarrative): Promise<void>;
+  recordGynUltrasound(patientId: string, us: GynUltrasoundInput): Promise<void>;
+  recordScreening(patientId: string, s: CervicalScreeningInput): Promise<void>;
+  updateScreening(id: string, patch: Partial<CervicalScreening>): Promise<void>;
+  recordColposcopy(patientId: string, c: ColposcopyInput): Promise<void>;
+  updateColposcopy(id: string, patch: Partial<Colposcopy>): Promise<void>;
+  recordGynProcedure(patientId: string, p: GynProcedureInput): Promise<void>;
+  updateGynProcedure(id: string, patch: Partial<GynProcedure>): Promise<void>;
 }

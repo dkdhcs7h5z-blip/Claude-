@@ -484,3 +484,178 @@ export interface ObstetricWorklistRow {
   last_fetal_movements: FetalMovements | null;
   visit_count: number;
 }
+
+// --- Gynecology ------------------------------------------------------------------
+export type MenopauseStatus = 'premenopausal' | 'perimenopausal' | 'postmenopausal' | 'surgical';
+export type Contraception = 'none' | 'coc' | 'pop' | 'iud_copper' | 'lng_ius' | 'implant' | 'injectable' | 'condom' | 'sterilization' | 'other';
+
+export interface GynProfile {
+  patient_id: string;
+  clinic_id: string;
+  menarche_age: number | null;
+  cycle_length_days: number | null;
+  period_duration_days: number | null;
+  cycle_regularity: 'regular' | 'irregular' | 'absent' | null;
+  menstrual_flow: 'light' | 'normal' | 'heavy' | null;
+  dysmenorrhea: 'none' | 'mild' | 'moderate' | 'severe' | null;
+  menopause_status: MenopauseStatus | null;
+  menopause_age: number | null;
+  on_hrt: boolean | null;
+  contraception: Contraception | null;
+  sexually_active: boolean | null;
+  hpv_vaccinated: 'yes' | 'no' | 'unknown' | null;
+  hysterectomy: 'none' | 'subtotal' | 'total' | null;
+  previous_gyn_surgery: string | null;
+  notes: string | null;
+  updated_at?: string;
+}
+export type GynProfileInput = Omit<GynProfile, 'patient_id' | 'updated_at'>;
+
+export interface GynVisit {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  encounter_id: string;
+  visit_date: string;
+  complaints: string[];
+  palm_coein: string[];
+  lmp: string | null;
+  pain_score: number | null;
+  bp_systolic: number | null;
+  bp_diastolic: number | null;
+  weight_kg: number | null;
+  height_cm: number | null;
+  clinical_hyperandrogenism: boolean | null;
+  biochemical_hyperandrogenism: boolean | null;
+  abdominal_exam: string | null;
+  speculum_exam: string | null;
+  bimanual_exam: string | null;
+  uterus_size: 'normal' | 'bulky' | 'enlarged_lt12w' | 'enlarged_ge12w' | 'not_assessed' | null;
+  adnexal_tenderness: boolean | null;
+  cervical_motion_tenderness: boolean | null;
+  pop_stage: number | null;
+  diagnosis: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+export type GynVisitInput = Partial<Omit<GynVisit, 'id' | 'patient_id' | 'clinic_id' | 'encounter_id' | 'created_by' | 'created_at'>>;
+export interface GynVisitRow extends GynVisit { encounter: AntenatalVisitRow['encounter'] }
+
+export interface Fibroid { figo_type: string; size_mm: number | null; location: string | null }
+
+export interface GynUltrasound {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  performed_at: string;
+  route: 'transabdominal' | 'transvaginal' | 'transrectal' | null;
+  uterus_length_mm: number | null;
+  uterus_ap_mm: number | null;
+  uterus_width_mm: number | null;
+  uterus_position: 'anteverted' | 'retroverted' | 'axial' | 'absent' | null;
+  endometrial_thickness_mm: number | null;
+  endometrium_appearance: 'normal' | 'thickened' | 'heterogeneous' | 'polyp' | 'fluid' | 'not_seen' | null;
+  fibroids: Fibroid[];
+  right_ovary_volume_ml: number | null;
+  left_ovary_volume_ml: number | null;
+  right_follicle_count: number | null;
+  left_follicle_count: number | null;
+  adnexal_mass: boolean;
+  mass_side: 'right' | 'left' | 'bilateral' | null;
+  mass_max_diameter_mm: number | null;
+  iota_b_features: string[];
+  iota_m_features: string[];
+  free_fluid: 'none' | 'small' | 'moderate' | 'large' | null;
+  impression: string | null;
+  performed_by: string | null;
+}
+export type GynUltrasoundInput = Omit<GynUltrasound, 'id' | 'patient_id' | 'clinic_id' | 'performed_by'> & { clinic_id?: string | null };
+
+export interface CervicalScreening {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  sample_date: string;
+  test_type: 'cytology' | 'hpv_primary' | 'cotest';
+  hpv_result: 'negative' | 'hpv16' | 'hpv18' | 'hpv16_18' | 'other_hr' | 'positive_untyped' | null;
+  cytology_result: 'nilm' | 'asc_us' | 'lsil' | 'asc_h' | 'hsil' | 'agc' | 'scc' | 'adenocarcinoma' | 'unsatisfactory' | null;
+  status: 'pending' | 'resulted';
+  recommendation: string | null;
+  next_due_date: string | null;
+  notes: string | null;
+  recorded_by: string | null;
+  created_at: string;
+}
+export type CervicalScreeningInput = Omit<CervicalScreening, 'id' | 'patient_id' | 'clinic_id' | 'recorded_by' | 'created_at'> & { clinic_id?: string | null };
+
+export interface Colposcopy {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  screening_id: string | null;
+  performed_at: string;
+  tz_type: 1 | 2 | 3 | null;
+  findings: 'normal' | 'minor_grade1' | 'major_grade2' | 'suspicious_invasion' | 'non_specific' | null;
+  biopsy_taken: boolean;
+  histology: 'pending' | 'normal' | 'cin1' | 'cin2' | 'cin3' | 'ais' | 'invasive' | null;
+  treatment: 'none' | 'lletz' | 'cone' | 'ablation' | 'follow_up' | null;
+  notes: string | null;
+  performed_by: string | null;
+}
+export type ColposcopyInput = Omit<Colposcopy, 'id' | 'patient_id' | 'clinic_id' | 'performed_by'> & { clinic_id?: string | null };
+
+export interface GynProcedure {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  performed_at: string;
+  procedure_code: string;
+  approach: 'office' | 'hysteroscopic' | 'laparoscopic' | 'robotic' | 'open' | 'vaginal' | null;
+  indication: string | null;
+  findings: string | null;
+  surgeon_id: string | null;
+  assistant: string | null;
+  anesthesia: 'none' | 'local' | 'sedation' | 'regional' | 'general' | null;
+  blood_loss_ml: number | null;
+  complications: string | null;
+  clavien_dindo: 'none' | 'I' | 'II' | 'IIIa' | 'IIIb' | 'IVa' | 'IVb' | 'V' | null;
+  histology_status: 'not_sent' | 'pending' | 'received';
+  histology_result: string | null;
+  notes: string | null;
+  recorded_by: string | null;
+}
+export type GynProcedureInput = Omit<GynProcedure, 'id' | 'patient_id' | 'clinic_id' | 'recorded_by'> & { clinic_id?: string | null };
+
+export interface GynDetail {
+  profile: GynProfile | null;
+  visits: GynVisitRow[];
+  ultrasounds: GynUltrasound[];
+  screenings: CervicalScreening[];
+  colposcopies: Colposcopy[];
+  procedures: GynProcedure[];
+}
+
+export interface GynWorklistRow {
+  patient_id: string;
+  clinic_id: string;
+  mrn: string;
+  first_name_en: string | null;
+  last_name_en: string | null;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  date_of_birth: string;
+  menopause_status: MenopauseStatus | null;
+  hysterectomy: GynProfile['hysterectomy'];
+  last_screening_date: string | null;
+  last_screening_test: CervicalScreening['test_type'] | null;
+  last_hpv_result: CervicalScreening['hpv_result'];
+  last_cytology_result: CervicalScreening['cytology_result'];
+  last_screening_status: CervicalScreening['status'] | null;
+  screening_next_due: string | null;
+  screening_recommendation: string | null;
+  last_colposcopy_date: string | null;
+  pending_histology: number;
+  last_visit_date: string | null;
+  last_complaints: string[] | null;
+}

@@ -1,5 +1,6 @@
 /* Fictional sample data for DEMO MODE only. No real persons or organizations. */
 import type {
+  CervicalScreening, Colposcopy, GynProcedure, GynProfile, GynUltrasound, GynVisit,
   AntenatalVisit, Delivery, Newborn, FetalBiometry, PostnatalVisit, LabourObservation,
   AccessGrant, AuditEvent, Clinic, DocumentMeta, Encounter, FertilityCycle, FetalAssessment,
   Patient, Pregnancy, Profile, ResearchProject,
@@ -94,6 +95,9 @@ export const DEMO_PATIENTS: Patient[] = [
   patient({ id: 'p10', clinic_id: 'c-main', mrn: 'MAIN-000107', first_name_en: 'Salma', last_name_en: 'Kamal',
     first_name_ar: 'سلمى', last_name_ar: 'كمال', date_of_birth: '1994-02-11', blood_group: 'B', rh_factor: 'positive',
     specialties: ['obstetrics'] }, 280),
+  patient({ id: 'p12', clinic_id: 'c-main', mrn: 'MAIN-000109', first_name_en: 'Samira', last_name_en: 'Hassan',
+    first_name_ar: 'سميرة', last_name_ar: 'حسن', date_of_birth: '1968-05-04', blood_group: 'A', rh_factor: 'positive',
+    specialties: ['gynecology'], marital_status: 'widowed' }, 20),
   patient({ id: 'p11', clinic_id: 'c-main', mrn: 'MAIN-000108', first_name_en: 'Rana', last_name_en: 'Youssef',
     first_name_ar: 'رنا', last_name_ar: 'يوسف', date_of_birth: '1997-07-23', blood_group: 'O', rh_factor: 'positive',
     specialties: ['obstetrics'] }, 210),
@@ -375,4 +379,90 @@ export const DEMO_LABOUR: LabourObservation[] = [
   lob(3.5, { fhr: 136, pulse: 88 }),
   lob(2.5, { cervical_dilation_cm: 6, descent_fifths: 3, contractions_per_10min: 4, contraction_duration_s: 45, fhr: 140, liquor: 'clear', bp_systolic: 122, bp_diastolic: 78 }),
   lob(0.5, { cervical_dilation_cm: 6.5, descent_fifths: 3, contractions_per_10min: 3, contraction_duration_s: 45, fhr: 134, liquor: 'meconium_light', moulding: 1, temperature_c: 37.4, oxytocin_mu_min: 2 }),
+];
+
+// --- Gynecology ------------------------------------------------------------------
+const gp = (o: Partial<GynProfile> & Pick<GynProfile, 'patient_id' | 'clinic_id'>): GynProfile => ({
+  menarche_age: null, cycle_length_days: null, period_duration_days: null, cycle_regularity: null, menstrual_flow: null,
+  dysmenorrhea: null, menopause_status: null, menopause_age: null, on_hrt: null, contraception: null, sexually_active: null,
+  hpv_vaccinated: null, hysterectomy: 'none', previous_gyn_surgery: null, notes: null, ...o,
+});
+export const DEMO_GYN_PROFILES: GynProfile[] = [
+  gp({ patient_id: 'p3', clinic_id: 'c-main', menarche_age: 12, cycle_length_days: 24, period_duration_days: 9, cycle_regularity: 'regular',
+    menstrual_flow: 'heavy', dysmenorrhea: 'moderate', menopause_status: 'premenopausal', contraception: 'none', sexually_active: true, hpv_vaccinated: 'no' }),
+  gp({ patient_id: 'p9', clinic_id: 'c-main', menarche_age: 13, cycle_length_days: 48, cycle_regularity: 'irregular', menstrual_flow: 'light',
+    menopause_status: 'premenopausal', contraception: 'none', sexually_active: false, hpv_vaccinated: 'yes' }),
+  gp({ patient_id: 'p12', clinic_id: 'c-main', menarche_age: 11, menopause_status: 'postmenopausal', menopause_age: 51, on_hrt: false,
+    contraception: 'none', hpv_vaccinated: 'no', previous_gyn_surgery: 'Laparoscopic cholecystectomy (2010)' }),
+  gp({ patient_id: 'p5', clinic_id: 'c-main', menarche_age: 12, cycle_length_days: 29, cycle_regularity: 'regular', menopause_status: 'premenopausal',
+    contraception: 'none', hpv_vaccinated: 'no' }),
+];
+
+const gv = (o: Partial<GynVisit> & Pick<GynVisit, 'id' | 'patient_id' | 'encounter_id' | 'visit_date'>): GynVisit => ({
+  clinic_id: 'c-main', complaints: [], palm_coein: [], lmp: null, pain_score: null, bp_systolic: null, bp_diastolic: null, weight_kg: null,
+  height_cm: null, clinical_hyperandrogenism: null, biochemical_hyperandrogenism: null, abdominal_exam: null, speculum_exam: null,
+  bimanual_exam: null, uterus_size: null, adnexal_tenderness: null, cervical_motion_tenderness: null, pop_stage: null, diagnosis: null,
+  notes: null, created_by: 'u-cons', created_at: '', ...o,
+});
+export const DEMO_GYN_VISITS: GynVisit[] = [
+  gv({ id: 'gv1', patient_id: 'p3', encounter_id: 'e2', visit_date: dateAgo(3), complaints: ['aub', 'dysmenorrhea'], palm_coein: ['L-SM'],
+    lmp: dateAgo(10), pain_score: 5, bp_systolic: 124, bp_diastolic: 78, weight_kg: 78, height_cm: 160, uterus_size: 'enlarged_lt12w',
+    speculum_exam: 'Healthy cervix', bimanual_exam: 'Bulky irregular uterus ~10 weeks size, adnexa free',
+    diagnosis: 'Heavy menstrual bleeding — submucous fibroid (FIGO 2)' }),
+  gv({ id: 'gv2', patient_id: 'p9', encounter_id: 'ge2', visit_date: dateAgo(5), complaints: ['amenorrhea', 'hirsutism_acne'], palm_coein: ['O'],
+    lmp: dateAgo(70), bp_systolic: 118, bp_diastolic: 74, weight_kg: 74, height_cm: 162, clinical_hyperandrogenism: true,
+    biochemical_hyperandrogenism: null, uterus_size: 'not_assessed', diagnosis: 'Oligomenorrhoea with hirsutism — ?PCOS', created_by: 'u-res' }),
+  gv({ id: 'gv3', patient_id: 'p12', encounter_id: 'ge3', visit_date: dateAgo(2), complaints: ['pmb'], pain_score: 2, bp_systolic: 146,
+    bp_diastolic: 88, weight_kg: 84, height_cm: 158, speculum_exam: 'Atrophic vagina, small amount of blood from os',
+    bimanual_exam: 'Normal size uterus; right adnexal fullness', uterus_size: 'normal', diagnosis: 'Postmenopausal bleeding' }),
+];
+export const DEMO_GYN_ENCOUNTERS: Encounter[] = [
+  { id: 'ge2', patient_id: 'p9', clinic_id: 'c-main', specialty: 'gynecology', encounter_type: 'consultation', encounter_at: daysAgo(5),
+    provider_id: 'u-res', is_private: false, status: 'draft', chief_complaint: 'Irregular periods and hirsutism', assessment: null, plan: 'Hormone profile, pelvic US' },
+  { id: 'ge3', patient_id: 'p12', clinic_id: 'c-main', specialty: 'gynecology', encounter_type: 'consultation', encounter_at: daysAgo(2),
+    provider_id: 'u-cons', is_private: false, status: 'signed', chief_complaint: 'Vaginal bleeding after menopause', assessment: null, plan: 'TVUS, endometrial biopsy' },
+];
+
+const us = (o: Partial<GynUltrasound> & Pick<GynUltrasound, 'id' | 'patient_id' | 'performed_at'>): GynUltrasound => ({
+  clinic_id: 'c-main', route: 'transvaginal', uterus_length_mm: null, uterus_ap_mm: null, uterus_width_mm: null, uterus_position: 'anteverted',
+  endometrial_thickness_mm: null, endometrium_appearance: null, fibroids: [], right_ovary_volume_ml: null, left_ovary_volume_ml: null,
+  right_follicle_count: null, left_follicle_count: null, adnexal_mass: false, mass_side: null, mass_max_diameter_mm: null,
+  iota_b_features: [], iota_m_features: [], free_fluid: 'none', impression: null, performed_by: 'u-cons', ...o,
+});
+export const DEMO_GYN_US: GynUltrasound[] = [
+  us({ id: 'gu1', patient_id: 'p3', performed_at: daysAgo(3), uterus_length_mm: 102, uterus_ap_mm: 62, uterus_width_mm: 70,
+    endometrial_thickness_mm: 11, endometrium_appearance: 'heterogeneous',
+    fibroids: [{ figo_type: '2', size_mm: 34, location: 'posterior fundal' }, { figo_type: '5', size_mm: 21, location: 'anterior' }],
+    right_ovary_volume_ml: 7, left_ovary_volume_ml: 6.2, impression: 'Two fibroids incl. FIGO 2 submucous 34 mm.' }),
+  us({ id: 'gu2', patient_id: 'p9', performed_at: daysAgo(5), route: 'transabdominal', endometrial_thickness_mm: 6, right_ovary_volume_ml: 12.4,
+    left_ovary_volume_ml: 11.1, right_follicle_count: 24, left_follicle_count: 21, impression: 'Polycystic ovarian morphology bilaterally.' }),
+  us({ id: 'gu3', patient_id: 'p12', performed_at: daysAgo(2), uterus_length_mm: 62, uterus_ap_mm: 30, endometrial_thickness_mm: 7.5,
+    endometrium_appearance: 'thickened', adnexal_mass: true, mass_side: 'right', mass_max_diameter_mm: 46, iota_b_features: ['B1'],
+    free_fluid: 'none', impression: 'Thickened endometrium 7.5 mm. Right unilocular cyst 46 mm (IOTA B1).' }),
+];
+
+const scr = (o: Partial<CervicalScreening> & Pick<CervicalScreening, 'id' | 'patient_id' | 'sample_date' | 'test_type'>): CervicalScreening => ({
+  clinic_id: 'c-main', hpv_result: null, cytology_result: null, status: 'resulted', recommendation: null, next_due_date: null, notes: null,
+  recorded_by: 'u-nurse', created_at: '', ...o,
+});
+export const DEMO_SCREENINGS: CervicalScreening[] = [
+  scr({ id: 'cs1', patient_id: 'p3', sample_date: dateAgo(21), test_type: 'cotest', hpv_result: 'hpv16', cytology_result: 'nilm', recommendation: 'colposcopy' }),
+  scr({ id: 'cs2', patient_id: 'p3', sample_date: dateAgo(1900), test_type: 'cytology', cytology_result: 'nilm', recommendation: 'routine_3y', next_due_date: dateAgo(800) }),
+  scr({ id: 'cs3', patient_id: 'p9', sample_date: dateAgo(400), test_type: 'cytology', cytology_result: 'nilm', recommendation: 'routine_3y', next_due_date: dateAgo(-695) }),
+  scr({ id: 'cs4', patient_id: 'p12', sample_date: dateAgo(2600), test_type: 'cytology', cytology_result: 'nilm', recommendation: 'routine_3y', next_due_date: dateAgo(1505) }),
+  scr({ id: 'cs5', patient_id: 'p5', sample_date: dateAgo(90), test_type: 'cotest', hpv_result: 'other_hr', cytology_result: 'hsil', recommendation: 'colposcopy_expedited' }),
+];
+export const DEMO_COLPOSCOPIES: Colposcopy[] = [
+  { id: 'cp1', patient_id: 'p5', clinic_id: 'c-main', screening_id: 'cs5', performed_at: dateAgo(70), tz_type: 1, findings: 'major_grade2',
+    biopsy_taken: true, histology: 'cin2', treatment: 'lletz', notes: 'Acetowhite lesion 3–6 o’clock', performed_by: 'u-cons' },
+];
+export const DEMO_GYN_PROCEDURES: GynProcedure[] = [
+  { id: 'gpx1', patient_id: 'p5', clinic_id: 'c-main', performed_at: dateAgo(30), procedure_code: 'lletz', approach: 'office',
+    indication: 'CIN2 on colposcopic biopsy', findings: 'Type 1 TZ, single pass 12 mm depth', surgeon_id: 'u-cons', assistant: null,
+    anesthesia: 'local', blood_loss_ml: 10, complications: null, clavien_dindo: 'none', histology_status: 'pending', histology_result: null,
+    notes: null, recorded_by: 'u-cons' },
+  { id: 'gpx2', patient_id: 'p3', clinic_id: 'c-main', performed_at: dateAgo(400), procedure_code: 'diagnostic_hysteroscopy', approach: 'office',
+    indication: 'Heavy menstrual bleeding', findings: 'Submucous fibroid posterior wall', surgeon_id: 'u-cons', assistant: null,
+    anesthesia: 'none', blood_loss_ml: null, complications: null, clavien_dindo: 'none', histology_status: 'not_sent', histology_result: null,
+    notes: null, recorded_by: 'u-cons' },
 ];
