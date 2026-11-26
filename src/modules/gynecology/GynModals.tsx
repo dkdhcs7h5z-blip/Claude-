@@ -6,6 +6,8 @@ import { api } from '@/data';
 import { useAuth } from '@/auth/AuthProvider';
 import { Alert, Badge, Button, Checkbox, Field, Input, Modal, Textarea } from '@/components/ui';
 import type { Fibroid, GynProfile, GynUltrasound, GynVisitInput, GynVisitRow, Patient } from '@/data/types';
+import { RMI_FEATURES } from '@/clinical/ovarian';
+import { OvarianRiskBlock } from './Assessments';
 import { FIGO_FIBROID_TYPES, GYN_COMPLAINTS, IOTA_B, IOTA_M, PALM_COEIN, iotaSimpleRules } from '@/clinical/gynecology';
 import { todayIso } from '@/clinical/obstetrics';
 import { num, orNull, str } from '@/modules/obstetrics/formUtils';
@@ -161,13 +163,17 @@ export function GynVisitModal({ patient, visit, onClose }: { patient: Patient; v
 // ---------------------------------------------------------------------------
 const iotaTone = { benign: 'green', malignant: 'red', inconclusive: 'amber' } as const;
 
-export function UltrasoundModal({ patient, onClose }: { patient: Patient; onClose: () => void }) {
+export function UltrasoundModal({ patient, postmenopausal, ca125, he4, onClose }: {
+  patient: Patient; postmenopausal: boolean; ca125: number | null; he4: number | null; onClose: () => void;
+}) {
   const { t } = useTranslation();
   const clinicId = useClinicFor(patient);
   const [error, setError] = useState<string | null>(null);
   const [fibroids, setFibroids] = useState<Array<{ figo: string; size: string; location: string }>>([]);
   const [b, setB] = useState<string[]>([]);
   const [m, setM] = useState<string[]>([]);
+  const [rmiF, setRmiF] = useState<string[]>([]);
+  const [orads, setOrads] = useState('');
   const [f, setF] = useState({
     date: todayIso(), route: 'transvaginal', length: '', ap: '', width: '', position: '', et: '', endometrium: '',
     rVol: '', lVol: '', rFoll: '', lFoll: '', mass: false, side: '', diameter: '', fluid: '', impression: '',
@@ -182,6 +188,7 @@ export function UltrasoundModal({ patient, onClose }: { patient: Patient; onClos
     right_ovary_volume_ml: num(f.rVol), left_ovary_volume_ml: num(f.lVol), right_follicle_count: num(f.rFoll), left_follicle_count: num(f.lFoll),
     adnexal_mass: f.mass, mass_side: f.mass ? orNull(f.side) : null, mass_max_diameter_mm: f.mass ? num(f.diameter) : null,
     iota_b_features: f.mass ? b : [], iota_m_features: f.mass ? m : [], free_fluid: orNull(f.fluid), impression: orNull(f.impression),
+    orads_category: f.mass && orads !== '' ? Number(orads) : null, rmi_features: f.mass ? rmiF : [],
   };
   const save = useSave(patient.id, () => api.recordGynUltrasound(patient.id, { ...payload, clinic_id: clinicId }), onClose, setError);
 
@@ -236,6 +243,9 @@ export function UltrasoundModal({ patient, onClose }: { patient: Patient; onClos
           <ChipSelect legend={t('gyn.us.iotaB')} values={IOTA_B} selected={b} onChange={setB} ns="gyn.iotaV" />
           <ChipSelect legend={t('gyn.us.iotaM')} values={IOTA_M} selected={m} onChange={setM} ns="gyn.iotaV" />
           {iota && <p className="text-sm">{t('gyn.us.iotaResult')}: <Badge tone={iotaTone[iota]}>{t(`gyn.iotaResultV.${iota}`)}</Badge></p>}
+          <ChipSelect legend={t('gyn.ovarian.rmiFeatures')} values={RMI_FEATURES} selected={rmiF} onChange={setRmiF} ns="gyn.ovarian.rmiFeatureV" />
+          <EnumField label={t('gyn.ovarian.orads')} value={orads} onChange={setOrads} values={['0', '1', '2', '3', '4', '5']} ns="gyn.ovarian.oradsV" />
+          <OvarianRiskBlock orads={orads === '' ? null : Number(orads)} rmiFeatures={rmiF} postmenopausal={postmenopausal} ca125={ca125} he4={he4} />
         </>}
       </fieldset>
       <div className="grid gap-3 sm:grid-cols-3">

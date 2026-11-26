@@ -1,5 +1,6 @@
 /* Fictional sample data for DEMO MODE only. No real persons or organizations. */
 import type {
+  LabResult, MenopauseAssessment, UrogynAssessment,
   CervicalScreening, Colposcopy, GynProcedure, GynProfile, GynUltrasound, GynVisit,
   AntenatalVisit, Delivery, Newborn, FetalBiometry, PostnatalVisit, LabourObservation,
   AccessGrant, AuditEvent, Clinic, DocumentMeta, Encounter, FertilityCycle, FetalAssessment,
@@ -427,7 +428,8 @@ const us = (o: Partial<GynUltrasound> & Pick<GynUltrasound, 'id' | 'patient_id' 
   clinic_id: 'c-main', route: 'transvaginal', uterus_length_mm: null, uterus_ap_mm: null, uterus_width_mm: null, uterus_position: 'anteverted',
   endometrial_thickness_mm: null, endometrium_appearance: null, fibroids: [], right_ovary_volume_ml: null, left_ovary_volume_ml: null,
   right_follicle_count: null, left_follicle_count: null, adnexal_mass: false, mass_side: null, mass_max_diameter_mm: null,
-  iota_b_features: [], iota_m_features: [], free_fluid: 'none', impression: null, performed_by: 'u-cons', ...o,
+  iota_b_features: [], iota_m_features: [], free_fluid: 'none', impression: null, orads_category: null, rmi_features: [],
+  performed_by: 'u-cons', ...o,
 });
 export const DEMO_GYN_US: GynUltrasound[] = [
   us({ id: 'gu1', patient_id: 'p3', performed_at: daysAgo(3), uterus_length_mm: 102, uterus_ap_mm: 62, uterus_width_mm: 70,
@@ -438,6 +440,7 @@ export const DEMO_GYN_US: GynUltrasound[] = [
     left_ovary_volume_ml: 11.1, right_follicle_count: 24, left_follicle_count: 21, impression: 'Polycystic ovarian morphology bilaterally.' }),
   us({ id: 'gu3', patient_id: 'p12', performed_at: daysAgo(2), uterus_length_mm: 62, uterus_ap_mm: 30, endometrial_thickness_mm: 7.5,
     endometrium_appearance: 'thickened', adnexal_mass: true, mass_side: 'right', mass_max_diameter_mm: 46, iota_b_features: ['B1'],
+    orads_category: 2, rmi_features: [],
     free_fluid: 'none', impression: 'Thickened endometrium 7.5 mm. Right unilocular cyst 46 mm (IOTA B1).' }),
 ];
 
@@ -465,4 +468,28 @@ export const DEMO_GYN_PROCEDURES: GynProcedure[] = [
     indication: 'Heavy menstrual bleeding', findings: 'Submucous fibroid posterior wall', surgeon_id: 'u-cons', assistant: null,
     anesthesia: 'none', blood_loss_ml: null, complications: null, clavien_dindo: 'none', histology_status: 'not_sent', histology_result: null,
     notes: null, recorded_by: 'u-cons' },
+];
+
+// --- Labs & questionnaires -------------------------------------------------------
+let labN = 0;
+const lab = (patient_id: string, ago: number, test_code: string, value: number, unit: string, ref_low: number | null, ref_high: number | null, cycle_day: number | null = null): LabResult =>
+  ({ id: `lab${++labN}`, patient_id, clinic_id: 'c-main', collected_at: dateAgo(ago), test_code, value, unit, ref_low, ref_high, cycle_day, notes: null, recorded_by: 'u-nurse' });
+export const DEMO_LABS: LabResult[] = [
+  // p9 — PCOS work-up (day 3): raised testosterone / FAI, LH:FSH ≈ 2.6, normal prolactin & TSH
+  lab('p9', 4, 'lh', 13.8, 'IU/L', 2.4, 12.6, 3), lab('p9', 4, 'fsh', 5.3, 'IU/L', 3.5, 12.5, 3),
+  lab('p9', 4, 'testosterone', 2.6, 'nmol/L', 0.29, 1.67), lab('p9', 4, 'shbg', 24, 'nmol/L', 26.1, 110),
+  lab('p9', 4, 'prolactin', 310, 'mIU/L', 102, 496), lab('p9', 4, 'tsh', 2.1, 'mIU/L', 0.27, 4.2),
+  lab('p9', 4, 'hba1c', 5.8, '%', 4.0, 5.6), lab('p9', 4, 'amh', 8.9, 'ng/mL', null, null),
+  // p3 — heavy menstrual bleeding: iron deficiency anaemia
+  lab('p3', 3, 'hemoglobin', 9.6, 'g/dL', 12, 15.5), lab('p3', 3, 'ferritin', 7, 'µg/L', 15, 150), lab('p3', 3, 'tsh', 1.8, 'mIU/L', 0.27, 4.2),
+  // p12 — postmenopausal, adnexal cyst: CA-125 & HE4
+  lab('p12', 2, 'ca125', 22, 'U/mL', 0, 35), lab('p12', 2, 'he4', 61, 'pmol/L', null, null), lab('p12', 2, 'fsh', 78, 'IU/L', null, null),
+];
+export const DEMO_MRS: MenopauseAssessment[] = [
+  { id: 'mrs1', patient_id: 'p12', clinic_id: 'c-main', assessed_at: dateAgo(2), items: [3, 1, 3, 2, 2, 1, 2, 2, 1, 3, 2],
+    total: 22, somatic: 9, psychological: 7, urogenital: 6, notes: null, recorded_by: 'u-cons' },
+];
+export const DEMO_ICIQ: UrogynAssessment[] = [
+  { id: 'iq1', patient_id: 'p12', clinic_id: 'c-main', assessed_at: dateAgo(2), frequency: 2, amount: 2, interference: 4, score: 8,
+    leak_situations: ['cough_sneeze', 'before_toilet'], notes: null, recorded_by: 'u-cons' },
 ];

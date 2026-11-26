@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { DataService, AuthUser } from './service';
 import type {
+  LabResult, MenopauseAssessment, UrogynAssessment,
   CervicalScreening, Colposcopy, GynProcedure, GynProfile, GynUltrasound, GynVisitRow, GynWorklistRow,
   FetalBiometry, LabourObservation, PostnatalVisitRow,
   AntenatalVisitRow, Delivery, FetalAssessment, Newborn, ObstetricWorklistRow, Pregnancy,
@@ -347,7 +348,7 @@ export class SupabaseService implements DataService {
   }
 
   async getGynDetail(patientId: string) {
-    const [profile, visits, us, scr, colpo, proc] = await Promise.all([
+    const [profile, visits, us, scr, colpo, proc, labs, mrs, iciq] = await Promise.all([
       this.sb.from('gyn_profiles').select('*').eq('patient_id', patientId).maybeSingle(),
       this.sb.from('gyn_visits').select('*, encounter:encounters!gyn_visits_encounter_id_fkey(id, status, provider_id, is_private, assessment, plan, chief_complaint, signed_by, signed_at)')
         .eq('patient_id', patientId).order('visit_date'),
@@ -355,6 +356,9 @@ export class SupabaseService implements DataService {
       this.sb.from('cervical_screenings').select('*').eq('patient_id', patientId).order('sample_date'),
       this.sb.from('colposcopies').select('*').eq('patient_id', patientId).order('performed_at'),
       this.sb.from('gyn_procedures').select('*').eq('patient_id', patientId).order('performed_at'),
+      this.sb.from('lab_results').select('*').eq('patient_id', patientId).order('collected_at'),
+      this.sb.from('menopause_assessments').select('*').eq('patient_id', patientId).order('assessed_at'),
+      this.sb.from('urogyn_assessments').select('*').eq('patient_id', patientId).order('assessed_at'),
     ]);
     return {
       profile: check(profile) as GynProfile | null,
@@ -363,6 +367,9 @@ export class SupabaseService implements DataService {
       screenings: check(scr) as CervicalScreening[],
       colposcopies: check(colpo) as Colposcopy[],
       procedures: check(proc) as GynProcedure[],
+      labs: check(labs) as LabResult[],
+      menopause_assessments: check(mrs) as MenopauseAssessment[],
+      urogyn_assessments: check(iciq) as UrogynAssessment[],
     };
   }
 
@@ -406,5 +413,18 @@ export class SupabaseService implements DataService {
 
   async updateGynProcedure(id: string, patch: Partial<GynProcedure>) {
     check(await this.sb.from('gyn_procedures').update(patch).eq('id', id));
+  }
+
+  async recordLabResults(patientId: string, results: Parameters<DataService['recordLabResults']>[1]) {
+    const clinic_id = await this.patientClinic(patientId);
+    check(await this.sb.from('lab_results').insert(results.map((r) => ({ ...r, patient_id: patientId, clinic_id }))));
+  }
+
+  async recordMenopauseAssessment(patientId: string, a: Parameters<DataService['recordMenopauseAssessment']>[1]) {
+    check(await this.sb.from('menopause_assessments').insert({ ...a, patient_id: patientId, clinic_id: await this.patientClinic(patientId) }));
+  }
+
+  async recordUrogynAssessment(patientId: string, a: Parameters<DataService['recordUrogynAssessment']>[1]) {
+    check(await this.sb.from('urogyn_assessments').insert({ ...a, patient_id: patientId, clinic_id: await this.patientClinic(patientId) }));
   }
 }

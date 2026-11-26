@@ -13,7 +13,7 @@ A secure, multi-user Electronic Medical Record (EMR) and clinical research platf
 
 Built with **React + TypeScript + Vite**, **Supabase** (Auth, PostgreSQL, Storage, Edge Functions), full **Arabic/English with RTL/LTR**, responsive for desktop/tablet/phone, and installable as a **PWA**.
 
-> **Status: Phase 2 in progress.** Phase 1 foundation (authentication, role-based access, patient management, secure documents, audit logging, dashboard, modular shell) is complete. The **Obstetrics module** is implemented — dating, high-risk assessment, antenatal flow sheet, fetal growth & multiples, partogram, delivery, postnatal care, printable antenatal card and worklist ([clinical spec](docs/OBSTETRICS.md)). The **Gynecology module** is implemented — history, PALM-COEIN visits, cervical screening with next-step support, colposcopy, pelvic ultrasound with IOTA, procedures and worklist ([clinical spec](docs/GYNECOLOGY.md)). Infertility and fetal medicine follow — see [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: Phase 2 in progress.** Phase 1 foundation (authentication, role-based access, patient management, secure documents, audit logging, dashboard, modular shell) is complete. The **Obstetrics module** is implemented — dating, high-risk assessment, antenatal flow sheet, fetal growth & multiples, partogram, delivery, postnatal care, printable antenatal card and worklist ([clinical spec](docs/OBSTETRICS.md)). The **Gynecology module** is implemented — history, PALM-COEIN visits, cervical screening with next-step support, colposcopy, pelvic ultrasound with IOTA, ovarian-mass risk (RMI, ROMA, O-RADS), laboratory results, menopause (MRS) and incontinence (ICIQ) questionnaires, procedures and worklist ([clinical spec](docs/GYNECOLOGY.md)). Infertility and fetal medicine follow — see [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
@@ -57,7 +57,7 @@ With no Supabase credentials the app runs against an **in-memory demo backend** 
 | `npm run dev` | Development server |
 | `npm run build` | Type-check + production build (with service worker) |
 | `npm test` | Unit tests (dating, risk rules, care schedule, permission matrix ↔ SQL sync, access logic) |
-| `npm run test:db` | Applies all migrations to a scratch PostgreSQL DB and runs the **195-case RLS/authorization/clinical-integrity suite** (needs local `psql`) |
+| `npm run test:db` | Applies all migrations to a scratch PostgreSQL DB and runs the **213-case RLS/authorization/clinical-integrity suite** (needs local `psql`) |
 
 ## Project layout
 

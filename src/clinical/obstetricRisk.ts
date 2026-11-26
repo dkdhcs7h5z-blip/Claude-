@@ -120,7 +120,10 @@ export type AlertCode =
   // gynecology
   | 'pmb_thick_endometrium' | 'pmb_thin_endometrium' | 'pmb_needs_assessment' | 'asymptomatic_thick_endometrium'
   | 'aub_45_sampling' | 'postcoital_bleeding' | 'iota_malignant' | 'iota_inconclusive' | 'screening_action'
-  | 'screening_overdue' | 'histology_pending' | 'pcos_criteria' | 'prolapse_stage' | 'severe_pain' | 'gyn_hypertension';
+  | 'screening_overdue' | 'histology_pending' | 'pcos_criteria' | 'prolapse_stage' | 'severe_pain' | 'gyn_hypertension'
+  | 'poi_confirmed' | 'poi_possible' | 'hyperprolactinemia' | 'tsh_high' | 'tsh_low' | 'hyperandrogenism_lab' | 'diabetes_range'
+  | 'prediabetes_range' | 'anemia_lab' | 'iron_deficiency' | 'ca125_raised' | 'mrs_severe' | 'mrs_psychological'
+  | 'continuous_leakage' | 'iciq_severe' | 'orads_5' | 'orads_4' | 'rmi_high' | 'roma_high';
 
 export interface ClinicalAlert {
   code: AlertCode;

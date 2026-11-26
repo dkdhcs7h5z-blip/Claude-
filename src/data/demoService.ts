@@ -1,5 +1,6 @@
 import type { DataService, AuthUser } from './service';
 import type {
+  LabResult, MenopauseAssessment, UrogynAssessment,
   CervicalScreening, Colposcopy, GynDetail, GynProcedure, GynProfile, GynUltrasound, GynVisit, GynVisitRow, GynWorklistRow,
   FetalBiometry, LabourObservation, PostnatalVisit, PostnatalVisitRow,
   AccessGrant, AntenatalVisit, AntenatalVisitRow, AuditEvent, Delivery, DocumentMeta, Encounter, MyAccess, Newborn,
@@ -14,6 +15,7 @@ import {
   DEMO_CLINICS, DEMO_CYCLES, DEMO_DOCUMENTS, DEMO_ENCOUNTERS, DEMO_FETAL, DEMO_GRANTS, DEMO_PATIENTS,
   DEMO_PREGNANCIES, DEMO_RESEARCH, DEMO_RESEARCH_MEMBERS, DEMO_USERS, seedAudit, type DemoUser,
   DEMO_VISITS, DEMO_VISIT_ENCOUNTERS, DEMO_DELIVERIES, DEMO_NEWBORNS,
+  DEMO_LABS, DEMO_MRS, DEMO_ICIQ,
   DEMO_GYN_PROFILES, DEMO_GYN_VISITS, DEMO_GYN_ENCOUNTERS, DEMO_GYN_US, DEMO_SCREENINGS, DEMO_COLPOSCOPIES, DEMO_GYN_PROCEDURES,
   DEMO_DELIVERIES_EXTRA, DEMO_SCANS, DEMO_BIOMETRY_SEED, DEMO_POSTNATAL, DEMO_POSTNATAL_ENCOUNTERS, DEMO_LABOUR,
 } from './demoData';
@@ -53,6 +55,9 @@ export class DemoService implements DataService {
   private screenings: CervicalScreening[] = clone(DEMO_SCREENINGS);
   private colposcopies: Colposcopy[] = clone(DEMO_COLPOSCOPIES);
   private gynProcedures: GynProcedure[] = clone(DEMO_GYN_PROCEDURES);
+  private labs: LabResult[] = clone(DEMO_LABS);
+  private mrs: MenopauseAssessment[] = clone(DEMO_MRS);
+  private iciq: UrogynAssessment[] = clone(DEMO_ICIQ);
   private biometry: FetalBiometry[] = clone(DEMO_BIOMETRY_SEED).map((b) => ({ ...b, efw_g: hadlockEfw(b.hc_mm, b.ac_mm, b.fl_mm) ?? b.efw_g }));
   private postnatal: PostnatalVisit[] = clone(DEMO_POSTNATAL);
   private labour: LabourObservation[] = clone(DEMO_LABOUR);
@@ -753,7 +758,9 @@ export class DemoService implements DataService {
   async getGynDetail(patientId: string): Promise<GynDetail> {
     await delay(80);
     const p = this.patients.find((x) => x.id === patientId);
-    if (!p || !this.can(p, 'clinical.read')) return { profile: null, visits: [], ultrasounds: [], screenings: [], colposcopies: [], procedures: [] };
+    if (!p || !this.can(p, 'clinical.read')) {
+      return { profile: null, visits: [], ultrasounds: [], screenings: [], colposcopies: [], procedures: [], labs: [], menopause_assessments: [], urogyn_assessments: [] };
+    }
     const visits: GynVisitRow[] = this.gynVisits.filter((v) => v.patient_id === patientId)
       .map((v) => ({ v, e: this.encounters.find((e) => e.id === v.encounter_id)! }))
       .filter(({ e }) => this.encounterVisible(e))
@@ -770,6 +777,9 @@ export class DemoService implements DataService {
       screenings: by(this.screenings).sort((a, b) => a.sample_date.localeCompare(b.sample_date)),
       colposcopies: by(this.colposcopies).sort((a, b) => a.performed_at.localeCompare(b.performed_at)),
       procedures: by(this.gynProcedures).sort((a, b) => a.performed_at.localeCompare(b.performed_at)),
+      labs: by(this.labs).sort((a, b) => a.collected_at.localeCompare(b.collected_at)),
+      menopause_assessments: by(this.mrs).sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
+      urogyn_assessments: by(this.iciq).sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
     });
   }
 
@@ -827,7 +837,9 @@ export class DemoService implements DataService {
   async recordGynUltrasound(patientId: string, u: Parameters<DataService['recordGynUltrasound']>[1]) {
     await delay();
     this.patientOrThrow(patientId, 'clinical.write');
-    if (!u.adnexal_mass && (u.iota_b_features.length || u.iota_m_features.length)) throw new Error('IOTA features require an adnexal mass');
+    if (!u.adnexal_mass && (u.iota_b_features.length || u.iota_m_features.length || u.rmi_features.length || u.orads_category != null)) {
+      throw new Error('Mass features require an adnexal mass');
+    }
     const { clinic_id, ...rest } = u;
     this.gynUs.push({ ...rest, id: crypto.randomUUID(), patient_id: patientId, clinic_id: this.clinicFor(patientId, clinic_id), performed_by: this.currentId });
     this.log('INSERT', 'gyn_ultrasounds', patientId);
@@ -903,5 +915,38 @@ export class DemoService implements DataService {
     if (next.histology_result && next.histology_status !== 'received') throw new Error('Histology result requires status received');
     Object.assign(p, patch);
     this.log('UPDATE', 'gyn_procedures', p.patient_id, { changed_fields: Object.keys(patch) });
+  }
+
+  async recordLabResults(patientId: string, results: Parameters<DataService['recordLabResults']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    const clinicId = this.clinicFor(patientId);
+    for (const r of results) {
+      if (r.collected_at > todayIso()) throw new Error('Collection date cannot be in the future');
+      if (r.ref_low != null && r.ref_high != null && r.ref_low > r.ref_high) throw new Error('Reference range must be ordered');
+      if (r.value < 0) throw new Error('Value cannot be negative');
+    }
+    results.forEach((r) => this.labs.push({ ...r, id: crypto.randomUUID(), patient_id: patientId, clinic_id: clinicId, recorded_by: this.currentId }));
+    this.log('INSERT', 'lab_results', patientId);
+  }
+
+  async recordMenopauseAssessment(patientId: string, a: Parameters<DataService['recordMenopauseAssessment']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    if (a.items.length !== 11 || a.items.some((x) => x < 0 || x > 4)) throw new Error('All 11 items must be scored 0–4');
+    const s = (idx: number[]) => idx.reduce((t, i) => t + a.items[i], 0);
+    const somatic = s([0, 1, 2, 10]), psychological = s([3, 4, 5, 6]), urogenital = s([7, 8, 9]);
+    this.mrs.push({ ...a, id: crypto.randomUUID(), patient_id: patientId, clinic_id: this.clinicFor(patientId), somatic, psychological, urogenital,
+      total: somatic + psychological + urogenital, recorded_by: this.currentId });
+    this.log('INSERT', 'menopause_assessments', patientId);
+  }
+
+  async recordUrogynAssessment(patientId: string, a: Parameters<DataService['recordUrogynAssessment']>[1]) {
+    await delay();
+    this.patientOrThrow(patientId, 'clinical.write');
+    if (![0, 2, 4, 6].includes(a.amount)) throw new Error('Amount must be 0, 2, 4 or 6');
+    this.iciq.push({ ...a, id: crypto.randomUUID(), patient_id: patientId, clinic_id: this.clinicFor(patientId),
+      score: a.frequency + a.amount + a.interference, recorded_by: this.currentId });
+    this.log('INSERT', 'urogyn_assessments', patientId);
   }
 }

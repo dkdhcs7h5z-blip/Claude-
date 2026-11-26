@@ -14,6 +14,7 @@ import { deriveGyn } from './derive';
 import { GynVisitModal, HistoryModal, UltrasoundModal } from './GynModals';
 import { ScreeningSection, statusTone } from './ScreeningSection';
 import { ProceduresSection } from './ProceduresSection';
+import { LabsCard, MenopauseCard, OvarianRiskBlock, UrogynCard } from './Assessments';
 
 const iotaTone = { benign: 'green', malignant: 'red', inconclusive: 'amber' } as const;
 
@@ -75,7 +76,9 @@ function VisitsCard({ patient, visits, canWrite, onNew, onEdit }: {
   );
 }
 
-function UltrasoundCard({ items, canWrite, onNew }: { items: GynUltrasound[]; canWrite: boolean; onNew: () => void }) {
+function UltrasoundCard({ items, canWrite, onNew, postmenopausal, ca125, he4 }: {
+  items: GynUltrasound[]; canWrite: boolean; onNew: () => void; postmenopausal: boolean; ca125: number | null; he4: number | null;
+}) {
   const { t } = useTranslation();
   const lang = useLang();
   return (
@@ -109,6 +112,7 @@ function UltrasoundCard({ items, canWrite, onNew }: { items: GynUltrasound[]; ca
                     {[...u.iota_b_features, ...u.iota_m_features].length > 0 && <> · {[...u.iota_b_features, ...u.iota_m_features].join(', ')}</>}</p>
                 )}
                 {u.impression && <p className="text-slate-600">{u.impression}</p>}
+                {u.adnexal_mass && <OvarianRiskBlock orads={u.orads_category} rmiFeatures={u.rmi_features} postmenopausal={postmenopausal} ca125={ca125} he4={he4} />}
               </li>
             );
           })}
@@ -153,12 +157,20 @@ export function GynecologyTab({ patient, canWrite }: { patient: Patient; canWrit
           <Card title={t('ob.alerts.title')}><AlertList alerts={d.alerts} /></Card>
           <VisitsCard patient={patient} visits={det.visits} canWrite={canWrite} onNew={() => { setEditVisit(null); setModal('visit'); }}
             onEdit={(v) => { setEditVisit(v); setModal('visit'); }} />
-          <UltrasoundCard items={det.ultrasounds} canWrite={canWrite} onNew={() => setModal('us')} />
+          <UltrasoundCard items={det.ultrasounds} canWrite={canWrite} onNew={() => setModal('us')} postmenopausal={d.postmenopausal} ca125={d.ca125} he4={d.he4} />
+          <LabsCard patient={patient} labs={det.labs} fai={d.fai} lhFsh={d.lhFsh} canWrite={canWrite} />
           <ProceduresSection patient={patient} procedures={det.procedures} canWrite={canWrite} />
         </div>
         <div className="min-w-0 space-y-5">
           <ScreeningSection patient={patient} ageYears={d.age} hysterectomy={p?.hysterectomy} screenings={det.screenings}
             colposcopies={det.colposcopies} status={d.screening} canWrite={canWrite} />
+          {(d.postmenopausal || p?.menopause_status === 'perimenopausal' || det.menopause_assessments.length > 0
+            || det.visits.some((v) => v.complaints.includes('menopause_symptoms'))) && (
+            <MenopauseCard patient={patient} items={det.menopause_assessments} canWrite={canWrite} />
+          )}
+          {(det.urogyn_assessments.length > 0 || det.visits.some((v) => v.complaints.includes('incontinence') || v.complaints.includes('prolapse') || (v.pop_stage ?? 0) >= 1)) && (
+            <UrogynCard patient={patient} items={det.urogyn_assessments} canWrite={canWrite} />
+          )}
           {d.premenopausal && d.pcos.met > 0 && (
             <Card title={t('gyn.pcos.title')}>
               <ul className="space-y-1.5 text-sm">
@@ -192,7 +204,7 @@ export function GynecologyTab({ patient, canWrite }: { patient: Patient; canWrit
 
       {modal === 'history' && <HistoryModal patient={patient} profile={p} onClose={() => setModal(null)} />}
       {modal === 'visit' && <GynVisitModal key={editVisit?.id ?? 'new'} patient={patient} visit={editVisit} onClose={() => setModal(null)} />}
-      {modal === 'us' && <UltrasoundModal patient={patient} onClose={() => setModal(null)} />}
+      {modal === 'us' && <UltrasoundModal patient={patient} postmenopausal={d.postmenopausal} ca125={d.ca125} he4={d.he4} onClose={() => setModal(null)} />}
     </div>
   );
 }

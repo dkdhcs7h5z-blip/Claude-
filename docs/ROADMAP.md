@@ -8,7 +8,8 @@ Authentication · per-clinic RBAC with hybrid patient-level access · relational
 - **Obstetrics ✅ (second iteration):** high-risk assessment per the clinic card (past vs ongoing factors, suggested level, detection from records, plan & medications) · fetal biometry with Hadlock EFW and centile chart · per-fetus data & chorionicity for multiples · structured postnatal visits with EPDS · partogram · printable bilingual antenatal card.
   *Next:* per-clinic schedule configuration, CTG/NST & BPP, structured lab results.
 - **Gynecology ✅:** structured history · visits with PALM-COEIN, POP-Q and hyperandrogenism · cervical screening with next-step support and status tracking · colposcopy & histology · pelvic ultrasound with FIGO fibroids and IOTA Simple Rules · PMB / AUB ≥ 45 / PCOS decision support · procedures with Clavien-Dindo and histology tracking · worklist. See [GYNECOLOGY.md](GYNECOLOGY.md).
-  *Next:* menopause symptom scores, O-RADS, urogynecology questionnaires, hormone lab results.
+- **Gynecology ✅ (second iteration):** shared laboratory results with FAI, LH:FSH and POI / prolactin / thyroid / glycaemia / anaemia interpretation · Menopause Rating Scale · ICIQ-UI SF · ovarian-mass risk (RMI I, ROMA, clinician-assigned O-RADS).
+  *Next:* PFDI-20 / PISQ, lab import (HL7), automatic O-RADS once validated against the ACR tables.
 - **Infertility & IVF:** couple records (partner as linked person), stimulation monitoring charts, oocyte retrieval, embryology lab, transfer, cryostorage inventory with chain of custody.
 - **Fetal medicine:** first-trimester combined screening, anomaly scan reporting, growth/Doppler surveillance with centile charts, invasive procedures, multiple pregnancy, fetal therapy.
 - Encounter editor with sign/amend workflow UI.

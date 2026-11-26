@@ -51,10 +51,42 @@ Simplified from the ASCCP 2019 risk-based management guidelines with USPSTF 2018
 | PCOS (Rotterdam, 2 of 3) | oligo/anovulation (irregular/absent cycles or cycle < 21 / > 35 d) · clinical or biochemical hyperandrogenism · PCOM ≥ 20 follicles per ovary or volume ≥ 10 mL; shown with the exclusion reminder | 2023 International PCOS Guideline |
 | Screening action / overdue, pending histology, POP-Q ≥ 2, pain ≥ 7/10, BP ≥ 140/90 | as labelled | — |
 
-## 4. Data integrity (database)
+## 4. Laboratory results (shared with all specialties)
+
+`lab_results` stores each value **with the reporting laboratory's reference range** (pre-filled from typical adult female ranges, editable). Flags (low / high / normal) come from the stored range. Panels: reproductive hormones, PCOS/androgens, thyroid, metabolic, tumour markers, anaemia.
+
+| Derived / interpretation | Rule | Source |
+|---|---|---|
+| Free androgen index | testosterone (nmol/L) × 100 / SHBG (nmol/L), SHBG within 30 days | — |
+| LH : FSH ratio | same-day LH / FSH | — |
+| Biochemical hyperandrogenism | testosterone above range or FAI ≥ 5 (default) — **feeds the Rotterdam PCOS criteria** | 2023 PCOS guideline |
+| Premature ovarian insufficiency | age < 40, FSH > 25 IU/L twice ≥ 4 weeks apart (single value → repeat) | ESHRE 2016 |
+| Hyperprolactinaemia · TSH high/low | above / outside the lab range | — |
+| Diabetes / prediabetes range | HbA1c ≥ 6.5 % or FPG ≥ 7.0 · HbA1c 5.7–6.4 % or FPG 5.6–6.9 mmol/L | ADA |
+| Anaemia · iron deficiency | Hb < 12 g/dL (< 8 critical) · ferritin < 30 µg/L | WHO · NICE NG88 |
+| CA-125 raised | > 35 U/mL (used in RMI / ROMA) | — |
+
+## 5. Questionnaires
+
+- **Menopause Rating Scale** (Heinemann 2004): 11 items 0–4, total & subscales computed by the database. Total 0–4 none/little · 5–8 mild · 9–16 moderate · ≥ 17 severe; somatic, psychological and urogenital bands per the MRS manual. Alerts: severe total; severe psychological subscale → mood assessment.
+- **ICIQ-UI Short Form** (Avery 2004): frequency 0–5 + amount 0/2/4/6 + interference 0–10 = 0–21 (computed by the database). Severity (Klovning 2009): 1–5 slight · 6–12 moderate · 13–18 severe · 19–21 very severe. Type from Q6: stress (cough/sneeze, activity), urge (before reaching the toilet), mixed. *Leaks all the time* → consider fistula.
+
+## 6. Ovarian-mass risk
+
+| Tool | Implementation |
+|---|---|
+| **RMI I** (Jacobs 1990) | U × M × CA-125; U = 0/1/3 for 0/1/≥ 2 of multilocular, solid areas, bilateral, ascites, metastases; M = 1 pre / 3 postmenopausal. **RMI ≥ 200 → gynae-oncology** (RCOG GTG 34/62). Computed live from the ultrasound and the latest CA-125. |
+| **ROMA** (Moore 2009) | logistic equations for pre/postmenopausal women from HE4 and CA-125. Cut-offs are **assay-specific**; defaults are Abbott ARCHITECT (7.4 % / 25.3 %) and can be changed in `ROMA_CUTOFFS`. |
+| **O-RADS US** (ACR v2022) | category 0–5 **assigned by the clinician** from the lexicon; the system shows the risk band (0 %, < 1 %, 1–< 10 %, 10–< 50 %, ≥ 50 %) and management. Automatic O-RADS classification is deliberately not implemented — the rule set has many lesion-specific branches and a silent misclassification would be worse than a manual category. |
+
+Alerts: O-RADS 5 (critical), O-RADS 4, RMI ≥ 200 (critical), ROMA above cut-off.
+
+## 7. Data integrity (database)
 
 Visit links immutable and **signed visits read-only**; PALM-COEIN, complaint, IOTA, FIGO, Bethesda and HPV values restricted to valid codes; LMP not after the visit; menopause age only with a postmenopausal status (NULL-safe); IOTA features only when a mass is recorded; screening result must match the test type before it can be marked resulted; dates not in the future; colposcopy may only link to the same patient's screening; histology requires a biopsy or excision; procedure histology result only when received; surgeon defaults to the recording clinician; recording history or a visit tags the patient with *gynecology*. Every table is under RLS (clinical permissions, private visits hidden with their encounter) and the audit log.
 
+Labs, MRS and ICIQ records are under the same RLS and audit; lab values must be non-negative with an ordered reference range and a non-future date; MRS needs all 11 items 0–4; ICIQ amount must be 0/2/4/6; O-RADS and RMI features only with a recorded adnexal mass.
+
 ## Not yet included
 
-Menopause symptom scores (MRS / Greene) · urogynecology questionnaires · O-RADS US scoring · RMI / ROMA · structured lab results (hormone profiles) · per-programme screening configuration.
+Automatic O-RADS classification · PFDI-20 / PISQ questionnaires · lab import from analysers (HL7) · per-programme screening configuration.

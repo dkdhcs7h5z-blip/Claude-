@@ -1,4 +1,5 @@
 import type {
+  LabResultInput,
   CervicalScreening, CervicalScreeningInput, ColposcopyInput, GynDetail, GynProcedureInput, GynProfileInput,
   GynUltrasoundInput, GynVisitInput, GynWorklistRow, Colposcopy, GynProcedure,
   FetalBiometryInput, FetalScanInput, LabourObservationInput, PostnatalVisitInput,
@@ -114,4 +115,7 @@ export interface DataService {
   updateColposcopy(id: string, patch: Partial<Colposcopy>): Promise<void>;
   recordGynProcedure(patientId: string, p: GynProcedureInput): Promise<void>;
   updateGynProcedure(id: string, patch: Partial<GynProcedure>): Promise<void>;
+  recordLabResults(patientId: string, results: LabResultInput[]): Promise<void>;
+  recordMenopauseAssessment(patientId: string, a: { assessed_at: string; items: number[]; notes: string | null }): Promise<void>;
+  recordUrogynAssessment(patientId: string, a: { assessed_at: string; frequency: number; amount: number; interference: number; leak_situations: string[]; notes: string | null }): Promise<void>;
 }

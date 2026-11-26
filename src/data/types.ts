@@ -568,6 +568,8 @@ export interface GynUltrasound {
   iota_m_features: string[];
   free_fluid: 'none' | 'small' | 'moderate' | 'large' | null;
   impression: string | null;
+  orads_category: number | null;
+  rmi_features: string[];
   performed_by: string | null;
 }
 export type GynUltrasoundInput = Omit<GynUltrasound, 'id' | 'patient_id' | 'clinic_id' | 'performed_by'> & { clinic_id?: string | null };
@@ -634,6 +636,53 @@ export interface GynDetail {
   screenings: CervicalScreening[];
   colposcopies: Colposcopy[];
   procedures: GynProcedure[];
+  labs: LabResult[];
+  menopause_assessments: MenopauseAssessment[];
+  urogyn_assessments: UrogynAssessment[];
+}
+
+export interface LabResult {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  collected_at: string;
+  test_code: string;
+  value: number;
+  unit: string;
+  ref_low: number | null;
+  ref_high: number | null;
+  cycle_day: number | null;
+  notes: string | null;
+  recorded_by: string | null;
+}
+export type LabResultInput = Omit<LabResult, 'id' | 'patient_id' | 'clinic_id' | 'recorded_by'>;
+
+export interface MenopauseAssessment {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  assessed_at: string;
+  items: number[];
+  total: number | null;
+  somatic: number | null;
+  psychological: number | null;
+  urogenital: number | null;
+  notes: string | null;
+  recorded_by: string | null;
+}
+
+export interface UrogynAssessment {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  assessed_at: string;
+  frequency: number;
+  amount: number;
+  interference: number;
+  score: number | null;
+  leak_situations: string[];
+  notes: string | null;
+  recorded_by: string | null;
 }
 
 export interface GynWorklistRow {
