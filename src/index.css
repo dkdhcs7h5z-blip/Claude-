@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-slate-50 text-slate-900 antialiased; }
+  html[dir='rtl'] body { font-family: 'IBM Plex Sans Arabic', 'Inter', system-ui, sans-serif; }
+  :focus-visible { @apply outline-none ring-2 ring-brand-500 ring-offset-1; }
+  /* Keep MRNs, phone numbers, dates and lab values left-to-right inside RTL text. */
+  .ltr-num { direction: ltr; unicode-bidi: isolate; }
+}
+
+@layer components {
+  .input {
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm
+           placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200
+           disabled:bg-slate-100 disabled:text-slate-500;
+  }
+  .label { @apply mb-1 block text-sm font-medium text-slate-700; }
+  .card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
+  .table-th { @apply px-4 py-2.5 text-start text-xs font-semibold uppercase tracking-wide text-slate-500; }
+  .table-td { @apply px-4 py-3 text-sm text-slate-700; }
+}
