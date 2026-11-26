@@ -22,6 +22,10 @@ interface Props {
   refLines?: Array<{ y: number; label: string }>;
   /** expected-range band: y-range as a function of x */
   band?: { from: number; to: number; lo: (x: number) => number; hi: (x: number) => number; label: string };
+  /** dashed reference curves (centiles, partogram alert/action lines) */
+  curves?: Array<{ label: string; from: number; to: number; fn: (x: number) => number | null }>;
+  /** x-axis tick spacing (default: 4 weeks in days) */
+  tickStep?: number;
   formatX: (x: number) => string;
   /** axis tick label (defaults to whole weeks) */
   formatTick?: (x: number) => string;
@@ -43,7 +47,7 @@ function niceTicks(min: number, max: number, count = 4): number[] {
   return out;
 }
 
-export function LineChart({ title, series, xDomain, yDomain, refLines = [], band, formatX, formatTick = (x) => String(Math.round(x / 7)), formatY = String, height = 200, emptyText }: Props) {
+export function LineChart({ title, series, xDomain, yDomain, refLines = [], band, curves = [], tickStep: baseStep = 28, formatX, formatTick = (x) => String(Math.round(x / 7)), formatY = String, height = 200, emptyText }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(300);
   const [hoverX, setHoverX] = useState<number | null>(null);
@@ -74,7 +78,7 @@ export function LineChart({ title, series, xDomain, yDomain, refLines = [], band
   const xs = [...new Set(all.map((p) => p.x))].sort((a, b) => a - b);
   const yTicks = niceTicks(y0, y1);
   // 4-week ticks, widened to 8 weeks when the plot is narrow (≥ 36px per label)
-  const tickStep = iw / ((xDomain[1] - xDomain[0]) / 28) < 36 ? 56 : 28;
+  const tickStep = iw / ((xDomain[1] - xDomain[0]) / baseStep) < 36 ? baseStep * 2 : baseStep;
   const weekStart = Math.ceil(xDomain[0] / tickStep) * tickStep;
   const xTicks: number[] = [];
   for (let d = weekStart; d <= xDomain[1]; d += tickStep) xTicks.push(d);
@@ -142,6 +146,26 @@ export function LineChart({ title, series, xDomain, yDomain, refLines = [], band
                 <text x={M.left + 4} y={sy(r.y) - 4} className="fill-slate-500 text-[10px]">{r.label}</text>
               </g>
             ))}
+
+            {curves.map((c) => {
+              const n = 32;
+              const pts: string[] = [];
+              let lastPt: [number, number] | null = null;
+              for (let i = 0; i <= n; i++) {
+                const x = c.from + ((c.to - c.from) * i) / n;
+                const y = c.fn(x);
+                if (y == null || y < y0 || y > y1) continue;
+                pts.push(`${sx(x)},${sy(y)}`);
+                lastPt = [sx(x), sy(y)];
+              }
+              if (pts.length < 2) return null;
+              return (
+                <g key={c.label}>
+                  <polyline fill="none" stroke="#94a3b8" strokeWidth={1.25} strokeDasharray="5 4" points={pts.join(' ')} />
+                  {lastPt && <text x={Math.min(lastPt[0] + 4, width - 4)} y={lastPt[1]} dy="0.32em" className="fill-slate-500 text-[10px]">{c.label}</text>}
+                </g>
+              );
+            })}
 
             {hoverX != null && <line x1={sx(hoverX)} x2={sx(hoverX)} y1={M.top} y2={M.top + ih} stroke="#94a3b8" />}
 

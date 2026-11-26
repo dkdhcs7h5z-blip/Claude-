@@ -4,17 +4,18 @@ import { useTranslation } from 'react-i18next';
 import { api } from '@/data';
 import { useAuth } from '@/auth/AuthProvider';
 import { Alert, Button, Checkbox, Field, Input, Modal, Select, Textarea } from '@/components/ui';
-import type { Patient, Pregnancy, PregnancyInput } from '@/data/types';
+import type { Chorionicity, Patient, Pregnancy, PregnancyInput } from '@/data/types';
 import { bmi, computeEdd, formatGADays, todayIso, type DatingMethod } from '@/clinical/obstetrics';
-import { RISK_FACTOR_CODES, PE_HIGH_FACTORS, type RiskFactorCode } from '@/clinical/obstetricRisk';
+import { assessPreeclampsia, ONGOING_CODES, PAST_HISTORY_CODES, SCREENING_CODES } from '@/clinical/obstetricRisk';
+import { classifyRisk } from '@/clinical/highRisk';
+import { ageInYears } from '@/clinical/obstetrics';
+import { Badge } from '@/components/ui';
 import { formatDate } from '@/lib/format';
 import { useLang } from '@/lib/queries';
 import { clinicName } from '@/lib/format';
 import { num, orNull, str } from './formUtils';
 
-const GDM_GROUP: RiskFactorCode[] = ['previous_gdm', 'previous_macrosomia', 'family_history_diabetes', 'high_prevalence_ethnicity_diabetes'];
-const PE_GROUP: RiskFactorCode[] = [...PE_HIGH_FACTORS, 'pregnancy_interval_over_10y', 'family_history_preeclampsia'];
-const OTHER_GROUP = RISK_FACTOR_CODES.filter((c) => !GDM_GROUP.includes(c) && !PE_GROUP.includes(c));
+const riskTone = { low: 'green', moderate: 'amber', high: 'red' } as const;
 
 function initialMethod(p?: Pregnancy | null): DatingMethod {
   if (!p) return 'lmp';
@@ -46,8 +47,9 @@ export function PregnancyFormModal({ open, onClose, patient, pregnancy }: {
     usWeeks: pregnancy?.us_dating_ga_days != null ? String(Math.floor(pregnancy.us_dating_ga_days / 7)) : '',
     usDays: pregnancy?.us_dating_ga_days != null ? String(pregnancy.us_dating_ga_days % 7) : '0',
     transferDate: str(pregnancy?.transfer_date), embryoAge: str(pregnancy?.embryo_age_days ?? 5),
+    cs: str(pregnancy?.previous_cs_count ?? 0), plan: str(pregnancy?.high_risk_plan), meds: str(pregnancy?.current_medications),
     gravida: str(pregnancy?.gravida ?? 1), para: str(pregnancy?.para ?? 0), abortus: str(pregnancy?.abortus ?? 0), living: str(pregnancy?.living ?? 0),
-    plurality: str(pregnancy?.plurality ?? 1), conception: pregnancy?.conception ?? 'spontaneous',
+    plurality: str(pregnancy?.plurality ?? 1), chorionicity: pregnancy?.chorionicity ?? '', conception: pregnancy?.conception ?? 'spontaneous',
     risk_level: pregnancy?.risk_level ?? 'low', risk_factors: pregnancy?.risk_factors ?? [] as string[],
     booking_date: str(pregnancy?.booking_date ?? todayIso()), weight: str(pregnancy?.booking_weight_kg), height: str(pregnancy?.height_cm),
     notes: str(pregnancy?.notes),
@@ -82,12 +84,16 @@ export function PregnancyFormModal({ open, onClose, patient, pregnancy }: {
         embryo_age_days: f.method === 'ivf_transfer' ? (Number(f.embryoAge) as 3 | 5 | 6) : null,
         gravida: num(f.gravida), para: num(f.para), abortus: num(f.abortus), living: num(f.living),
         plurality: Number(f.plurality) || 1,
+        chorionicity: Number(f.plurality) > 1 ? orNull<Chorionicity>(f.chorionicity) : null,
         conception: f.method === 'ivf_transfer' && f.conception === 'spontaneous' ? 'ivf' : f.conception,
         risk_level: f.risk_level as Pregnancy['risk_level'],
         risk_factors: f.risk_factors,
         booking_date: f.booking_date || null,
         booking_weight_kg: num(f.weight), height_cm: num(f.height),
         notes: orNull(f.notes),
+        previous_cs_count: num(f.cs),
+        high_risk_plan: orNull(f.plan),
+        current_medications: orNull(f.meds),
         status: pregnancy?.status ?? 'active',
         outcome_date: pregnancy?.outcome_date ?? null,
       };
@@ -109,10 +115,16 @@ export function PregnancyFormModal({ open, onClose, patient, pregnancy }: {
     set('risk_factors', f.risk_factors.includes(c) ? f.risk_factors.filter((x) => x !== c) : [...f.risk_factors, c]);
   const b = bmi(num(f.weight), num(f.height));
 
-  const group = (title: string, codes: readonly string[]) => (
-    <div>
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+  const plurality = Number(f.plurality) || 1;
+  const pe = assessPreeclampsia({ riskFactors: f.risk_factors, para: num(f.para), ageYears: ageInYears(patient.date_of_birth), plurality, bmi: b });
+  const suggestion = classifyRisk({ riskFactors: f.risk_factors, plurality, aspirinRecommended: pe.aspirinRecommended });
+  const reasonLabel = (c: string) => t(`ob.riskFactors.${c}`, { defaultValue: t(`ob.highRisk.${c}`, c) });
+
+  const group = (title: string, codes: readonly string[], tone: string, extra?: React.ReactNode) => (
+    <div className={`rounded-lg p-3 ring-1 ring-inset ${tone}`}>
+      <p className="mb-2 text-sm font-semibold text-slate-800">{title}</p>
       <div className="grid gap-2 sm:grid-cols-2">
+        {extra}
         {codes.map((c) => <Checkbox key={c} label={t(`ob.riskFactors.${c}`)} checked={f.risk_factors.includes(c)} onChange={() => toggleFactor(c)} />)}
       </div>
     </div>
@@ -187,12 +199,15 @@ export function PregnancyFormModal({ open, onClose, patient, pregnancy }: {
 
       <div>
         <p className="label">{t('ob.history.title')}</p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {(['gravida', 'para', 'abortus', 'living'] as const).map((k) => (
             <Field key={k} label={<span className="text-xs">{t(`ob.history.${k}`)}</span>}>
               <Input type="number" dir="ltr" min={0} max={30} value={f[k]} onChange={(e) => set(k, e.target.value)} />
             </Field>
           ))}
+          <Field label={<span className="text-xs">{t('ob.highRisk.csCount')}</span>}>
+            <Input type="number" dir="ltr" min={0} max={10} value={f.cs} onChange={(e) => set('cs', e.target.value)} />
+          </Field>
         </div>
       </div>
 
@@ -200,6 +215,16 @@ export function PregnancyFormModal({ open, onClose, patient, pregnancy }: {
         <Field label={t('ob.pregnancy.plurality')}>
           <Select value={f.plurality} onChange={(e) => set('plurality', e.target.value)}>{[1, 2, 3, 4].map((n) => <option key={n}>{n}</option>)}</Select>
         </Field>
+        {Number(f.plurality) > 1 && (
+          <Field label={t('ob.pregnancy.chorionicity')}>
+            <Select value={f.chorionicity} onChange={(e) => set('chorionicity', e.target.value)}>
+              <option value="">{t('common.unknown')}</option>
+              {(Number(f.plurality) === 2 ? ['dcda', 'mcda', 'mcma'] : ['tcta', 'dcta', 'mcta', 'other']).map((c) => (
+                <option key={c} value={c}>{t(`ob.chorionicityV.${c}`)}</option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label={t('ob.pregnancy.conception')}>
           <Select value={f.conception} onChange={(e) => set('conception', e.target.value)}>
             {['spontaneous', 'ovulation_induction', 'iui', 'ivf', 'icsi', 'other'].map((c) => <option key={c} value={c}>{t(`clinical.conceptionType.${c}`)}</option>)}
@@ -222,10 +247,25 @@ export function PregnancyFormModal({ open, onClose, patient, pregnancy }: {
 
       <fieldset className="space-y-3">
         <legend className="label">{t('ob.pregnancy.riskFactors')}</legend>
-        {group(t('ob.riskGroups.pe'), PE_GROUP)}
-        {group(t('ob.riskGroups.gdm'), GDM_GROUP)}
-        {group(t('ob.riskGroups.history'), OTHER_GROUP)}
+        {group(t('ob.riskGroups.past'), PAST_HISTORY_CODES, 'bg-emerald-50/40 ring-emerald-200')}
+        {group(t('ob.riskGroups.ongoing'), ONGOING_CODES, 'bg-red-50/40 ring-red-200',
+          <Checkbox label={t('ob.riskFactors.multiple_pregnancy')} help={t('ob.highRisk.multipleAuto')} checked={plurality > 1} onChange={() => undefined} disabled />)}
+        {group(t('ob.riskGroups.screening'), SCREENING_CODES, 'bg-slate-50 ring-slate-200')}
       </fieldset>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm">
+        <span className="font-medium text-slate-700">{t('ob.highRisk.suggested')}:</span>
+        <Badge tone={riskTone[suggestion.level]}>{t(`clinical.riskLevel.${suggestion.level}`)}</Badge>
+        {suggestion.level !== f.risk_level && (
+          <Button size="sm" variant="secondary" onClick={() => set('risk_level', suggestion.level)}>{t('ob.highRisk.apply')}</Button>
+        )}
+        {suggestion.reasons.length > 0 && (
+          <span className="w-full text-xs text-slate-500">{t('ob.highRisk.reasons')}: {suggestion.reasons.map(reasonLabel).join(lang === 'ar' ? '، ' : ', ')}</span>
+        )}
+      </div>
+
+      <Field label={t('ob.highRisk.plan')}><Textarea value={f.plan} onChange={(e) => set('plan', e.target.value)} /></Field>
+      <Field label={t('ob.highRisk.medications')}><Textarea value={f.meds} onChange={(e) => set('meds', e.target.value)} /></Field>
 
       <Field label={t('ob.pregnancy.notes')}><Textarea value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
     </Modal>

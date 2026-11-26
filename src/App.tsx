@@ -15,6 +15,7 @@ const PatientDetailPage = lazy(() => import('@/modules/patients/PatientDetailPag
 const PatientFormPage = lazy(() => import('@/modules/patients/PatientFormPage').then((m) => ({ default: m.PatientFormPage })));
 const SpecialtyPage = lazy(() => import('@/modules/specialty/SpecialtyPage').then((m) => ({ default: m.SpecialtyPage })));
 const ObstetricsPage = lazy(() => import('@/modules/obstetrics/ObstetricsPage').then((m) => ({ default: m.ObstetricsPage })));
+const AntenatalCardPage = lazy(() => import('@/modules/obstetrics/AntenatalCardPage').then((m) => ({ default: m.AntenatalCardPage })));
 const ResearchPage = lazy(() => import('@/modules/research/ResearchPage').then((m) => ({ default: m.ResearchPage })));
 const StaffPage = lazy(() => import('@/modules/admin/StaffPage').then((m) => ({ default: m.StaffPage })));
 const RolesPage = lazy(() => import('@/modules/admin/RolesPage').then((m) => ({ default: m.RolesPage })));
@@ -52,6 +53,9 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          {/* print view: no app shell */}
+          <Route path="patients/:id/antenatal-card/:pregnancyId"
+            element={<RequireAuth><RequirePermission perm="clinical.read"><Suspense fallback={<Spinner />}><AntenatalCardPage /></Suspense></RequirePermission></RequireAuth>} />
           <Route element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route index element={<AccountGate><DashboardPage /></AccountGate>} />
             <Route path="patients" element={<P perm="patient.read"><PatientsListPage /></P>} />

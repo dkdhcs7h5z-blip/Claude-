@@ -1,4 +1,5 @@
 import type {
+  FetalBiometryInput, FetalScanInput, LabourObservationInput, PostnatalVisitInput,
   AntenatalVisitInput, DeliveryInput, EncounterNarrative, NewbornInput, ObstetricWorklistRow, Pregnancy,
   PregnancyDetail, PregnancyInput,
   AccessGrant, AccessLevel, AuditEvent, Clinic, DashboardStats, DocumentCategory, DocumentMeta,
@@ -91,4 +92,10 @@ export interface DataService {
   signEncounter(encounterId: string): Promise<void>;
   /** Records delivery + newborns atomically and closes the pregnancy. Returns the delivery id. */
   recordDelivery(pregnancyId: string, delivery: DeliveryInput & { clinic_id?: string | null }, newborns: NewbornInput[]): Promise<string>;
+  /** Scan + per-fetus biometry atomically; EFW is computed by the backend. */
+  recordFetalScan(pregnancyId: string, scan: FetalScanInput, fetuses: FetalBiometryInput[]): Promise<string>;
+  recordPostnatalVisit(deliveryId: string, visit: PostnatalVisitInput, narrative: EncounterNarrative): Promise<string>;
+  addLabourObservation(pregnancyId: string, obs: LabourObservationInput): Promise<void>;
+  /** Labour observations are append-only; errors are flagged, never edited. */
+  markLabourObservationError(id: string): Promise<void>;
 }

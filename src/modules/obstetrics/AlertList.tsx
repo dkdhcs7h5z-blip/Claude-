@@ -21,7 +21,10 @@ export function AlertList({ alerts, compact = false }: { alerts: ClinicalAlert[]
         return (
           <li key={`${a.code}-${i}`} className={clsx('flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-sm ring-1 ring-inset', s.cls)}>
             <Icon className={clsx('mt-0.5 h-4 w-4 shrink-0', s.ic)} aria-hidden />
-            <span>{t(`ob.alerts.${a.code}`, a.values ?? {})}</span>
+            <span>
+              {a.values?.fetus ? <strong>{t('ob.fetusN', { label: a.values.fetus })}: </strong> : null}
+              {t(`ob.alerts.${a.code}`, a.values ?? {})}
+            </span>
           </li>
         );
       })}

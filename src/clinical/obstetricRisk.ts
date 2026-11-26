@@ -12,17 +12,29 @@
  */
 import type { AntenatalVisit, Pregnancy } from '@/data/types';
 
-export const RISK_FACTOR_CODES = [
-  // pre-eclampsia — high risk (NICE NG133)
-  'prev_hypertensive_pregnancy', 'chronic_kidney_disease', 'autoimmune_disease', 'diabetes_preexisting', 'chronic_hypertension',
-  // pre-eclampsia — moderate risk (age, parity, BMI, plurality are derived)
-  'pregnancy_interval_over_10y', 'family_history_preeclampsia',
-  // GDM (NICE NG3)
-  'previous_gdm', 'previous_macrosomia', 'family_history_diabetes', 'high_prevalence_ethnicity_diabetes',
-  // general obstetric history / conditions
-  'previous_cs', 'previous_preterm_birth', 'previous_stillbirth', 'recurrent_miscarriage', 'placenta_previa',
-  'thyroid_disease', 'epilepsy', 'cardiac_disease', 'smoking', 'rh_alloimmunization',
+/**
+ * Risk-factor codes, grouped as on the clinic's antenatal follow-up card:
+ *   A. past obstetric & medical history, B. ongoing-pregnancy high-risk factors,
+ *   plus additional screening factors used by the NICE pre-eclampsia / GDM rules.
+ */
+export const PAST_HISTORY_CODES = [
+  'prev_hypertensive_pregnancy', 'previous_gdm', 'diabetes_preexisting', 'previous_preterm_birth', 'previous_fgr',
+  'previous_stillbirth', 'recurrent_miscarriage', 'cervical_insufficiency', 'previous_fetal_anomaly', 'chronic_hypertension',
+  'chronic_kidney_disease', 'thyroid_disease', 'thrombophilia', 'autoimmune_disease', 'previous_pph', 'previous_uterine_surgery',
+  'previous_cs', 'cardiac_disease', 'epilepsy',
 ] as const;
+
+export const ONGOING_CODES = [
+  'current_hypertensive_disorder', 'current_gdm', 'current_fgr_abnormal_doppler', 'short_cervix_threatened_ptl',
+  'rh_alloimmunization', 'placenta_previa', 'oligo_polyhydramnios', 'suspected_fetal_anomaly', 'anticoagulant_or_aspirin',
+] as const;
+
+export const SCREENING_CODES = [
+  'pregnancy_interval_over_10y', 'family_history_preeclampsia', 'previous_macrosomia', 'family_history_diabetes',
+  'high_prevalence_ethnicity_diabetes', 'smoking',
+] as const;
+
+export const RISK_FACTOR_CODES = [...PAST_HISTORY_CODES, ...ONGOING_CODES, ...SCREENING_CODES] as const;
 export type RiskFactorCode = (typeof RISK_FACTOR_CODES)[number];
 
 export const PE_HIGH_FACTORS: RiskFactorCode[] = [
@@ -67,6 +79,8 @@ export interface GdmAssessment {
   earlyTesting: boolean;
   /** pre-existing diabetes is managed as diabetes, not screened */
   preexistingDiabetes: boolean;
+  /** GDM already diagnosed in this pregnancy */
+  diagnosed: boolean;
 }
 
 export function assessGdm(c: Pick<MaternalContext, 'riskFactors' | 'bmi'>): GdmAssessment {
@@ -76,11 +90,13 @@ export function assessGdm(c: Pick<MaternalContext, 'riskFactors' | 'bmi'>): GdmA
   (['previous_gdm', 'previous_macrosomia', 'family_history_diabetes', 'high_prevalence_ethnicity_diabetes'] as const)
     .forEach((r) => rf.has(r) && reasons.push(r));
   const preexistingDiabetes = rf.has('diabetes_preexisting');
+  const diagnosed = rf.has('current_gdm');
   return {
     reasons,
-    ogttIndicated: !preexistingDiabetes && reasons.length > 0,
-    earlyTesting: !preexistingDiabetes && rf.has('previous_gdm'),
+    ogttIndicated: !preexistingDiabetes && !diagnosed && reasons.length > 0,
+    earlyTesting: !preexistingDiabetes && !diagnosed && rf.has('previous_gdm'),
     preexistingDiabetes,
+    diagnosed,
   };
 }
 
@@ -92,7 +108,15 @@ export type AlertCode =
   | 'severe_hypertension' | 'suspected_preeclampsia' | 'hypertension' | 'proteinuria' | 'glycosuria'
   | 'absent_fetal_movements' | 'reduced_fetal_movements' | 'fhr_abnormal' | 'sfh_large' | 'sfh_small'
   | 'severe_anemia' | 'anemia' | 'malpresentation' | 'severe_edema'
-  | 'rh_negative' | 'post_dates' | 'post_term';
+  | 'rh_negative' | 'post_dates' | 'post_term'
+  // fetal growth / multiples
+  | 'fgr_suspected' | 'sga' | 'lga' | 'ua_aedf' | 'ua_redf' | 'oligohydramnios' | 'polyhydramnios' | 'low_placenta' | 'low_placenta_previa'
+  | 'twin_discordance' | 'monochorionic' | 'chorionicity_unknown'
+  // postnatal
+  | 'pn_severe_hypertension' | 'pn_hypertension' | 'epds_self_harm' | 'pn_fever' | 'pn_heavy_lochia' | 'pn_endometritis'
+  | 'pn_subinvolution' | 'pn_wound' | 'pn_mastitis' | 'epds_probable' | 'epds_possible' | 'pn_anemia'
+  // labour
+  | 'partogram_action' | 'partogram_alert' | 'thick_meconium' | 'tachysystole' | 'intrapartum_fever';
 
 export interface ClinicalAlert {
   code: AlertCode;
@@ -105,7 +129,8 @@ const proteinRank = { negative: 0, trace: 0.5, '1+': 1, '2+': 2, '3+': 3, '4+': 
 
 export function visitAlerts(
   v: Pick<AntenatalVisit, 'bp_systolic' | 'bp_diastolic' | 'urine_protein' | 'urine_glucose' | 'fetal_movements'
-    | 'fetal_heart_rate' | 'fundal_height_cm' | 'hemoglobin_g_dl' | 'presentation' | 'edema'>,
+    | 'fetal_heart_rate' | 'fundal_height_cm' | 'hemoglobin_g_dl' | 'presentation' | 'edema'>
+    & { fhr_by_fetus?: number[] | null; presentation_by_fetus?: string[] | null },
   gaDays: number | null,
   plurality = 1,
 ): ClinicalAlert[] {
@@ -133,9 +158,12 @@ export function visitAlerts(
     if (v.fetal_movements === 'absent') out.push({ code: 'absent_fetal_movements', severity: 'critical' });
     else if (v.fetal_movements === 'reduced') out.push({ code: 'reduced_fetal_movements', severity: 'warning' });
   }
-  if (v.fetal_heart_rate != null && (v.fetal_heart_rate < 110 || v.fetal_heart_rate > 160)) {
-    out.push({ code: 'fhr_abnormal', severity: 'warning', values: { fhr: v.fetal_heart_rate } });
-  }
+  const fhrs = v.fhr_by_fetus?.length ? v.fhr_by_fetus : v.fetal_heart_rate != null ? [v.fetal_heart_rate] : [];
+  fhrs.forEach((fhr, i) => {
+    if (fhr != null && (fhr < 110 || fhr > 160)) {
+      out.push({ code: 'fhr_abnormal', severity: 'warning', values: { fhr, fetus: fhrs.length > 1 ? String.fromCharCode(65 + i) : '' } });
+    }
+  });
   if (v.fundal_height_cm != null && weeks != null && weeks >= 24 && plurality === 1) {
     const diff = v.fundal_height_cm - Math.floor(weeks);
     if (diff > 2) out.push({ code: 'sfh_large', severity: 'warning', values: { sfh: v.fundal_height_cm, weeks: Math.floor(weeks) } });
@@ -146,8 +174,13 @@ export function visitAlerts(
     if (v.hemoglobin_g_dl < 7) out.push({ code: 'severe_anemia', severity: 'critical', values: { hb: v.hemoglobin_g_dl } });
     else if (v.hemoglobin_g_dl < limit) out.push({ code: 'anemia', severity: 'warning', values: { hb: v.hemoglobin_g_dl, limit } });
   }
-  if (weeks != null && weeks >= 36 && v.presentation && !['cephalic', 'not_assessed'].includes(v.presentation)) {
-    out.push({ code: 'malpresentation', severity: 'warning', values: { presentation: v.presentation } });
+  const presentations = v.presentation_by_fetus?.length ? v.presentation_by_fetus : v.presentation ? [v.presentation] : [];
+  if (weeks != null && weeks >= 36) {
+    presentations.forEach((p, i) => {
+      if (p && !['cephalic', 'not_assessed'].includes(p)) {
+        out.push({ code: 'malpresentation', severity: 'warning', values: { presentation: p, fetus: presentations.length > 1 ? String.fromCharCode(65 + i) : '' } });
+      }
+    });
   }
   if (v.edema === 'severe') out.push({ code: 'severe_edema', severity: 'info' });
   return out;

@@ -47,6 +47,7 @@ export function FlowSheet({ pregnancy, visits, canWrite, onEdit, onNew }: {
                 <th className="table-th">{t('ob.visit.fhr')}</th>
                 <th className="table-th">{t('ob.visit.movements')}</th>
                 <th className="table-th">{t('ob.visit.hb')}</th>
+                <th className="table-th">{t('ob.nextVisit')}</th>
                 <th className="table-th">{t('ob.alerts.title')}</th>
                 <th className="table-th">{t('common.status')}</th>
                 <th className="table-th"><span className="sr-only">{t('common.actions')}</span></th>
@@ -70,9 +71,10 @@ export function FlowSheet({ pregnancy, visits, canWrite, onEdit, onNew }: {
                     <td className="table-td">{v.urine_protein ? t(`ob.dipV.${v.urine_protein}`) : dash}</td>
                     <td className="table-td">{v.urine_glucose ? t(`ob.dipV.${v.urine_glucose}`) : dash}</td>
                     <td className="table-td tabular-nums">{v.fundal_height_cm ?? dash}</td>
-                    <td className="table-td tabular-nums">{v.fetal_heart_rate ?? dash}</td>
+                    <td className="table-td ltr-num whitespace-nowrap tabular-nums">{v.fhr_by_fetus?.length ? v.fhr_by_fetus.join(' / ') : v.fetal_heart_rate ?? dash}</td>
                     <td className="table-td">{v.fetal_movements ? t(`ob.movementsV.${v.fetal_movements}`) : dash}</td>
                     <td className="table-td tabular-nums">{v.hemoglobin_g_dl ?? dash}</td>
+                    <td className="table-td whitespace-nowrap">{v.next_visit_date ? formatDate(v.next_visit_date, lang) : dash}</td>
                     <td className="table-td"><AlertCountBadge alerts={alerts} /></td>
                     <td className="table-td">
                       <div className="flex flex-wrap gap-1">

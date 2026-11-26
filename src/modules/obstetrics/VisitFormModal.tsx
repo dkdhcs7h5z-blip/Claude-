@@ -31,6 +31,9 @@ export function VisitFormModal({ open, onClose, pregnancy, visit }: {
     protein: str(visit?.urine_protein), glucose: str(visit?.urine_glucose), sfh: str(visit?.fundal_height_cm),
     fhr: str(visit?.fetal_heart_rate), presentation: str(visit?.presentation), movements: str(visit?.fetal_movements),
     edema: str(visit?.edema), hb: str(visit?.hemoglobin_g_dl), notes: str(visit?.notes),
+    next: str(visit?.next_visit_date),
+    fhrs: Array.from({ length: Math.max(1, pregnancy.plurality) }, (_, i) => str(visit?.fhr_by_fetus?.[i] ?? (i === 0 ? visit?.fetal_heart_rate : null))),
+    pres: Array.from({ length: Math.max(1, pregnancy.plurality) }, (_, i) => str(visit?.presentation_by_fetus?.[i] ?? (i === 0 ? visit?.presentation : null))),
     assessment: str(visit?.encounter.assessment), plan: str(visit?.encounter.plan), is_private: visit?.encounter.is_private ?? false,
   }));
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
@@ -41,7 +44,18 @@ export function VisitFormModal({ open, onClose, pregnancy, visit }: {
     fetal_heart_rate: num(f.fhr), presentation: orNull<Presentation>(f.presentation),
     fetal_movements: orNull<FetalMovements>(f.movements), edema: orNull<Edema>(f.edema), hemoglobin_g_dl: num(f.hb),
     notes: orNull(f.notes),
+    next_visit_date: f.next || null,
   };
+  const multi = pregnancy.plurality > 1;
+  if (multi) {
+    const fhrs = f.fhrs.map(num);
+    // store per-fetus values only when every fetus was measured (keeps fetus order unambiguous)
+    payload.fhr_by_fetus = fhrs.every((x) => x != null) ? (fhrs as number[]) : null;
+    payload.fetal_heart_rate = fhrs[0] ?? null;
+    const pres = f.pres.map((x) => orNull<Presentation>(x));
+    payload.presentation_by_fetus = pres.every((x) => x == null) ? null : pres.map((x) => x ?? 'not_assessed');
+    payload.presentation = pres[0] ?? null;
+  }
   const ga = gaDaysOn(pregnancy, f.visit_date || todayIso());
   const liveAlerts = useMemo(() => visitAlerts({
     bp_systolic: payload.bp_systolic ?? null, bp_diastolic: payload.bp_diastolic ?? null,
@@ -49,6 +63,7 @@ export function VisitFormModal({ open, onClose, pregnancy, visit }: {
     fetal_movements: payload.fetal_movements ?? null, fetal_heart_rate: payload.fetal_heart_rate ?? null,
     fundal_height_cm: payload.fundal_height_cm ?? null, hemoglobin_g_dl: payload.hemoglobin_g_dl ?? null,
     presentation: payload.presentation ?? null, edema: payload.edema ?? null,
+    fhr_by_fetus: payload.fhr_by_fetus ?? null, presentation_by_fetus: payload.presentation_by_fetus ?? null,
   }, ga, pregnancy.plurality),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [f, ga, pregnancy.plurality]);
@@ -119,11 +134,32 @@ export function VisitFormModal({ open, onClose, pregnancy, visit }: {
 
       <fieldset>
         <legend className="mb-2 text-sm font-semibold text-slate-700">{t('ob.visit.fetal')}</legend>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {numField('fhr', t('ob.visit.fhr'), { min: 60, max: 240 })}
-          {selectField('presentation', t('ob.visit.presentation'), PRESENTATIONS, 'ob.presentationV')}
-          {selectField('movements', t('ob.visit.movements'), MOVEMENTS, 'ob.movementsV')}
-        </div>
+        {multi ? (
+          <div className="space-y-2">
+            {f.fhrs.map((_, i) => (
+              <div key={i} className="grid grid-cols-[auto_1fr_1fr] items-end gap-3">
+                <span className="pb-2 text-sm font-semibold text-slate-600">{String.fromCharCode(65 + i)}</span>
+                <Field label={t('ob.visit.fhr')}>
+                  <Input type="number" dir="ltr" min={60} max={240} value={f.fhrs[i]}
+                    onChange={(e) => setF((x) => ({ ...x, fhrs: x.fhrs.map((v, j) => (j === i ? e.target.value : v)) }))} />
+                </Field>
+                <Field label={t('ob.visit.presentation')}>
+                  <Select value={f.pres[i]} onChange={(e) => setF((x) => ({ ...x, pres: x.pres.map((v, j) => (j === i ? e.target.value : v)) }))}>
+                    <option value="">—</option>
+                    {PRESENTATIONS.map((v) => <option key={v} value={v}>{t(`ob.presentationV.${v}`)}</option>)}
+                  </Select>
+                </Field>
+              </div>
+            ))}
+            <div className="grid grid-cols-2 gap-3">{selectField('movements', t('ob.visit.movements'), MOVEMENTS, 'ob.movementsV')}</div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {numField('fhr', t('ob.visit.fhr'), { min: 60, max: 240 })}
+            {selectField('presentation', t('ob.visit.presentation'), PRESENTATIONS, 'ob.presentationV')}
+            {selectField('movements', t('ob.visit.movements'), MOVEMENTS, 'ob.movementsV')}
+          </div>
+        )}
       </fieldset>
 
       <fieldset>
@@ -146,7 +182,10 @@ export function VisitFormModal({ open, onClose, pregnancy, visit }: {
         <legend className="mb-2 text-sm font-semibold text-slate-700">{t('ob.visit.clinical')}</legend>
         <Field label={t('ob.visit.assessment')}><Textarea value={f.assessment} onChange={(e) => set('assessment', e.target.value)} /></Field>
         <Field label={t('ob.visit.plan')}><Textarea value={f.plan} onChange={(e) => set('plan', e.target.value)} /></Field>
-        <Field label={t('ob.visit.notes')}><Input value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('ob.visit.notes')}><Input value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
+          <Field label={t('ob.nextVisit')}><Input type="date" dir="ltr" value={f.next} min={f.visit_date} onChange={(e) => set('next', e.target.value)} /></Field>
+        </div>
         {!editing && <Checkbox label={t('ob.visit.private')} help={t('ob.visit.privateHelp')} checked={f.is_private} onChange={(v) => set('is_private', v)} />}
       </fieldset>
     </Modal>

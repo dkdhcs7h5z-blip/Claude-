@@ -3,17 +3,51 @@ import { CheckCircle2, Circle, CircleDot, CircleDashed, ShieldCheck } from 'luci
 import { clsx } from 'clsx';
 import { Card } from '@/components/ui';
 import type { GdmAssessment, PreeclampsiaAssessment } from '@/clinical/obstetricRisk';
+import type { RiskClassification } from '@/clinical/highRisk';
+import { Badge, Button } from '@/components/ui';
 import type { ScheduleItem } from '@/clinical/antenatalSchedule';
 import { formatGADays } from '@/clinical/obstetrics';
 
-export function RiskPanel({ pe, gdm, bmi }: { pe: PreeclampsiaAssessment; gdm: GdmAssessment; bmi: number | null }) {
+const riskTone = { low: 'green', moderate: 'amber', high: 'red' } as const;
+
+export function RiskPanel({ pe, gdm, bmi, suggestion, currentLevel, detected, onApplyLevel, onAddFactor }: {
+  pe: PreeclampsiaAssessment; gdm: GdmAssessment; bmi: number | null;
+  suggestion: RiskClassification; currentLevel: 'low' | 'moderate' | 'high'; detected: string[];
+  onApplyLevel?: () => void; onAddFactor?: (code: string) => void;
+}) {
   const { t, i18n } = useTranslation();
   const sep = i18n.language === 'ar' ? '، ' : ', ';
-  const label = (c: string) => t(`ob.riskFactors.${c}`, { defaultValue: t(`ob.derived.${c}`, c) });
+  const label = (c: string) => t(`ob.riskFactors.${c}`, { defaultValue: t(`ob.derived.${c}`, { defaultValue: t(`ob.highRisk.${c}`, c) }) });
   return (
     <Card title={t('ob.risk.title')}>
       <div className="space-y-4 text-sm">
         <section>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold text-slate-800">{t('ob.highRisk.suggested')}</h3>
+            <Badge tone={riskTone[suggestion.level]}>{t(`clinical.riskLevel.${suggestion.level}`)}</Badge>
+            {onApplyLevel && suggestion.level !== currentLevel && (
+              <Button size="sm" variant="secondary" onClick={onApplyLevel}>{t('ob.highRisk.apply')}</Button>
+            )}
+          </div>
+          {suggestion.reasons.length > 0 && (
+            <p className="mt-1 text-xs text-slate-600"><span className="font-medium">{t('ob.highRisk.reasons')}:</span> {suggestion.reasons.map(label).join(sep)}</p>
+          )}
+          {detected.length > 0 && (
+            <div className="mt-2 rounded-lg bg-amber-50 p-2 ring-1 ring-inset ring-amber-200">
+              <p className="text-xs font-semibold text-amber-900">{t('ob.highRisk.detected')}</p>
+              <p className="text-[11px] text-amber-800">{t('ob.highRisk.detectedHelp')}</p>
+              <ul className="mt-1.5 space-y-1">
+                {detected.map((c) => (
+                  <li key={c} className="flex items-center justify-between gap-2 text-xs text-amber-900">
+                    <span>{label(c)}</span>
+                    {onAddFactor && <Button size="sm" variant="secondary" onClick={() => onAddFactor(c)}>{t('ob.highRisk.add')}</Button>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+        <section className="border-t border-slate-100 pt-3">
           <h3 className="font-semibold text-slate-800">{t('ob.risk.pe')}</h3>
           <p className={clsx('mt-1', pe.aspirinRecommended ? 'font-medium text-amber-900' : 'text-slate-500')}>
             {pe.aspirinRecommended ? t('ob.risk.aspirin') : t('ob.risk.noAspirin')}
@@ -24,8 +58,8 @@ export function RiskPanel({ pe, gdm, bmi }: { pe: PreeclampsiaAssessment; gdm: G
         </section>
         <section className="border-t border-slate-100 pt-3">
           <h3 className="font-semibold text-slate-800">{t('ob.risk.gdm')}</h3>
-          <p className={clsx('mt-1', gdm.ogttIndicated || gdm.preexistingDiabetes ? 'font-medium text-amber-900' : 'text-slate-500')}>
-            {gdm.preexistingDiabetes ? t('ob.risk.preexisting') : gdm.earlyTesting ? t('ob.risk.ogttEarly') : gdm.ogttIndicated ? t('ob.risk.ogtt') : t('ob.risk.noOgtt')}
+          <p className={clsx('mt-1', gdm.ogttIndicated || gdm.preexistingDiabetes || gdm.diagnosed ? 'font-medium text-amber-900' : 'text-slate-500')}>
+            {gdm.preexistingDiabetes ? t('ob.risk.preexisting') : gdm.diagnosed ? t('ob.diagnosedGdm') : gdm.earlyTesting ? t('ob.risk.ogttEarly') : gdm.ogttIndicated ? t('ob.risk.ogtt') : t('ob.risk.noOgtt')}
           </p>
           {gdm.reasons.length > 0 && <p className="mt-1 text-xs text-slate-600"><span className="font-medium">{t('ob.risk.reasons')}:</span> {gdm.reasons.map(label).join(sep)}{bmi ? ` (BMI ${bmi})` : ''}</p>}
           <p className="mt-1 text-[11px] text-slate-400">{t('ob.risk.source')}: NICE NG3</p>

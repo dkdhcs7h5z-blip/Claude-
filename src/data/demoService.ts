@@ -1,9 +1,11 @@
 import type { DataService, AuthUser } from './service';
 import type {
+  FetalBiometry, LabourObservation, PostnatalVisit, PostnatalVisitRow,
   AccessGrant, AntenatalVisit, AntenatalVisitRow, AuditEvent, Delivery, DocumentMeta, Encounter, MyAccess, Newborn,
   ObstetricWorklistRow, Patient, PatientInput, Pregnancy, Profile, StaffMember,
 } from './types';
 import { gaDaysOn, todayIso } from '@/clinical/obstetrics';
+import { hadlockEfw } from '@/clinical/fetalGrowth';
 import type { Permission } from '@/rbac/permissions';
 import { ROLE_PERMISSIONS } from '@/rbac/permissions';
 import { hasPermission, hasPermissionAnywhere, patientCan } from '@/rbac/access';
@@ -11,6 +13,7 @@ import {
   DEMO_CLINICS, DEMO_CYCLES, DEMO_DOCUMENTS, DEMO_ENCOUNTERS, DEMO_FETAL, DEMO_GRANTS, DEMO_PATIENTS,
   DEMO_PREGNANCIES, DEMO_RESEARCH, DEMO_RESEARCH_MEMBERS, DEMO_USERS, seedAudit, type DemoUser,
   DEMO_VISITS, DEMO_VISIT_ENCOUNTERS, DEMO_DELIVERIES, DEMO_NEWBORNS,
+  DEMO_DELIVERIES_EXTRA, DEMO_SCANS, DEMO_BIOMETRY_SEED, DEMO_POSTNATAL, DEMO_POSTNATAL_ENCOUNTERS, DEMO_LABOUR,
 } from './demoData';
 import { buildStoragePath, MAX_UPLOAD_BYTES } from '@/lib/files';
 
@@ -40,13 +43,16 @@ export class DemoService implements DataService {
   private patients: Patient[] = clone(DEMO_PATIENTS);
   private pregnancies = clone(DEMO_PREGNANCIES);
   private cycles = clone(DEMO_CYCLES);
-  private fetal = clone(DEMO_FETAL);
-  private encounters: Encounter[] = clone([...DEMO_ENCOUNTERS, ...DEMO_VISIT_ENCOUNTERS]);
+  private fetal = clone([...DEMO_FETAL, ...DEMO_SCANS]);
+  private encounters: Encounter[] = clone([...DEMO_ENCOUNTERS, ...DEMO_VISIT_ENCOUNTERS, ...DEMO_POSTNATAL_ENCOUNTERS]);
+  private biometry: FetalBiometry[] = clone(DEMO_BIOMETRY_SEED).map((b) => ({ ...b, efw_g: hadlockEfw(b.hc_mm, b.ac_mm, b.fl_mm) ?? b.efw_g }));
+  private postnatal: PostnatalVisit[] = clone(DEMO_POSTNATAL);
+  private labour: LabourObservation[] = clone(DEMO_LABOUR);
   private visits: AntenatalVisit[] = clone(DEMO_VISITS);
-  private deliveries: Delivery[] = clone(DEMO_DELIVERIES);
+  private deliveries: Delivery[] = clone([...DEMO_DELIVERIES, ...DEMO_DELIVERIES_EXTRA]);
   private newborns: Newborn[] = clone(DEMO_NEWBORNS);
   private signatures = new Map<string, { by: string; at: string }>(
-    DEMO_VISIT_ENCOUNTERS.filter((e) => e.status === 'signed').map((e) => [e.id, { by: e.provider_id, at: e.encounter_at }]),
+    [...DEMO_VISIT_ENCOUNTERS, ...DEMO_POSTNATAL_ENCOUNTERS].filter((e) => e.status === 'signed').map((e) => [e.id, { by: e.provider_id, at: e.encounter_at }]),
   );
   private documents: DocumentMeta[] = clone(DEMO_DOCUMENTS);
   private grants: AccessGrant[] = clone(DEMO_GRANTS);
@@ -476,7 +482,20 @@ export class DemoService implements DataService {
         },
       }));
     const delivery = this.deliveries.find((d) => d.pregnancy_id === id) ?? null;
+    const encRow = (e: Encounter) => ({
+      id: e.id, status: e.status, provider_id: e.provider_id, is_private: e.is_private, assessment: e.assessment, plan: e.plan,
+      chief_complaint: e.chief_complaint, signed_by: this.signatures.get(e.id)?.by ?? null, signed_at: this.signatures.get(e.id)?.at ?? null,
+    });
+    const postnatal: PostnatalVisitRow[] = this.postnatal
+      .filter((v) => v.pregnancy_id === id)
+      .map((v) => ({ v, e: this.encounters.find((e) => e.id === v.encounter_id)! }))
+      .filter(({ e }) => this.encounterVisible(e))
+      .sort((a, b) => a.v.visit_date.localeCompare(b.v.visit_date))
+      .map(({ v, e }) => ({ ...v, encounter: encRow(e) }));
     return clone({
+      biometry: this.biometry.filter((b) => b.pregnancy_id === id).sort((a, b) => (a.ga_days ?? 0) - (b.ga_days ?? 0)),
+      postnatal_visits: postnatal,
+      labour: this.labour.filter((o) => o.pregnancy_id === id).sort((a, b) => a.observed_at.localeCompare(b.observed_at)),
       pregnancy: g,
       visits,
       delivery,
@@ -488,6 +507,8 @@ export class DemoService implements DataService {
   private validatePregnancy(g: Omit<Pregnancy, 'id'>, selfId?: string) {
     if (g.status === 'active' && !g.lmp && !g.edd) throw new Error('An ongoing pregnancy must be dated (LMP or EDD)');
     if (g.gravida != null && (g.para ?? 0) + (g.abortus ?? 0) > g.gravida) throw new Error('GPAL inconsistent: P + A must not exceed G');
+    if (g.chorionicity && g.plurality < 2) throw new Error('Chorionicity only applies to multiple pregnancies');
+    if (g.previous_cs_count != null && g.para != null && g.previous_cs_count > g.para) throw new Error('Caesarean count cannot exceed parity');
     if (g.status === 'active' && this.pregnancies.some((x) => x.patient_id === g.patient_id && x.status === 'active' && x.id !== selfId)) {
       throw new Error('This patient already has an ongoing pregnancy');
     }
@@ -522,6 +543,8 @@ export class DemoService implements DataService {
       throw new Error('Systolic pressure must be higher than diastolic');
     }
     if (v.visit_date && v.visit_date > todayIso()) throw new Error('Visit date cannot be in the future');
+    if (v.fhr_by_fetus?.some((x) => x < 60 || x > 240)) throw new Error('Fetal heart rate must be between 60 and 240');
+    if (v.next_visit_date && v.visit_date && v.next_visit_date <= v.visit_date) throw new Error('Next appointment must be after the visit');
   }
 
   async recordAntenatalVisit(pregnancyId: string, visit: Parameters<DataService['recordAntenatalVisit']>[1], narrative: Parameters<DataService['recordAntenatalVisit']>[2]) {
@@ -544,7 +567,8 @@ export class DemoService implements DataService {
       id, pregnancy_id: g.id, patient_id: g.patient_id, clinic_id: clinicId, encounter_id: encId, visit_date: date,
       ga_days: gaDaysOn(g, date), weight_kg: null, bp_systolic: null, bp_diastolic: null, pulse: null, urine_protein: null,
       urine_glucose: null, fundal_height_cm: null, fetal_heart_rate: null, presentation: null, fetal_movements: null,
-      edema: null, hemoglobin_g_dl: null, notes: null, ...visit, created_by: this.currentId, created_at: nowIso(),
+      edema: null, hemoglobin_g_dl: null, notes: null, fhr_by_fetus: null, presentation_by_fetus: null, next_visit_date: null,
+      ...visit, created_by: this.currentId, created_at: nowIso(),
     });
     this.log('INSERT', 'antenatal_visits', g.patient_id);
     return id;
@@ -597,5 +621,89 @@ export class DemoService implements DataService {
     g.outcome_date = delivery.delivered_at.slice(0, 10);
     this.log('INSERT', 'deliveries', g.patient_id);
     return id;
+  }
+
+  async recordFetalScan(pregnancyId: string, scan: Parameters<DataService['recordFetalScan']>[1], fetuses: Parameters<DataService['recordFetalScan']>[2]) {
+    await delay();
+    const g = this.pregnancyOrThrow(pregnancyId, 'clinical.write');
+    if (!fetuses.length || fetuses.length > g.plurality) throw new Error(`Provide between 1 and ${g.plurality} fetus records`);
+    if (new Set(fetuses.map((f) => f.fetus_label)).size !== fetuses.length) throw new Error('Fetus labels must be unique');
+    if (new Date(scan.performed_at) > new Date()) throw new Error('Scan date cannot be in the future');
+    const clinicId = scan.clinic_id || g.clinic_id;
+    this.assertMember(clinicId);
+    const id = crypto.randomUUID();
+    const ga = gaDaysOn(g, scan.performed_at.slice(0, 10));
+    this.fetal.push({
+      id, patient_id: g.patient_id, pregnancy_id: g.id, clinic_id: clinicId, assessment_type: scan.assessment_type,
+      performed_at: scan.performed_at, gestational_age_days: ga, fetus_number: fetuses.length, impression: scan.impression,
+    });
+    for (const f of fetuses) {
+      this.biometry.push({
+        crl_mm: null, bpd_mm: null, hc_mm: null, ac_mm: null, fl_mm: null, efw_g: null, afi_cm: null, dvp_cm: null, ua_pi: null,
+        ua_edf: null, mca_pi: null, fhr: null, presentation: null, placenta_location: null, notes: null, ...f,
+        id: crypto.randomUUID(), fetal_assessment_id: id, pregnancy_id: g.id, patient_id: g.patient_id, clinic_id: clinicId, ga_days: ga,
+      });
+      const b = this.biometry[this.biometry.length - 1];
+      b.efw_g = hadlockEfw(b.hc_mm, b.ac_mm, b.fl_mm) ?? b.efw_g;
+    }
+    this.log('INSERT', 'fetal_biometry', g.patient_id);
+    return id;
+  }
+
+  async recordPostnatalVisit(deliveryId: string, visit: Parameters<DataService['recordPostnatalVisit']>[1], narrative: Parameters<DataService['recordPostnatalVisit']>[2]) {
+    await delay();
+    const d = this.deliveries.find((x) => x.id === deliveryId);
+    if (!d) throw new Error('Delivery not found');
+    this.patientOrThrow(d.patient_id, 'clinical.write');
+    const date = visit.visit_date || todayIso();
+    if (date > todayIso()) throw new Error('Visit date cannot be in the future');
+    if (date < d.delivered_at.slice(0, 10)) throw new Error('Postnatal visit cannot precede the delivery');
+    if ((visit.bp_systolic == null) !== (visit.bp_diastolic == null)) throw new Error('Enter both systolic and diastolic pressure');
+    const clinicId = narrative.clinic_id || d.clinic_id;
+    this.assertMember(clinicId);
+    const encId = crypto.randomUUID();
+    this.encounters.push({
+      id: encId, patient_id: d.patient_id, clinic_id: clinicId, specialty: 'obstetrics', encounter_type: 'postnatal_visit',
+      encounter_at: date === todayIso() ? nowIso() : `${date}T00:00:00.000Z`, provider_id: this.currentId!,
+      is_private: narrative.is_private ?? false, status: 'draft', chief_complaint: narrative.chief_complaint ?? null,
+      assessment: narrative.assessment ?? null, plan: narrative.plan ?? null,
+    });
+    const id = crypto.randomUUID();
+    this.postnatal.push({
+      pulse: null, temperature_c: null, uterus: null, lochia: null, wound: null, breastfeeding: null, breasts: null, epds_score: null,
+      epds_self_harm: null, hemoglobin_g_dl: null, contraception: null, notes: null, bp_systolic: null, bp_diastolic: null, ...visit,
+      id, delivery_id: d.id, pregnancy_id: d.pregnancy_id, patient_id: d.patient_id, clinic_id: clinicId, encounter_id: encId,
+      visit_date: date, days_postpartum: Math.round((Date.parse(date) - Date.parse(d.delivered_at.slice(0, 10))) / 86_400_000),
+      created_by: this.currentId, created_at: nowIso(),
+    });
+    this.log('INSERT', 'postnatal_visits', d.patient_id);
+    return id;
+  }
+
+  async addLabourObservation(pregnancyId: string, obs: Parameters<DataService['addLabourObservation']>[1]) {
+    await delay();
+    const g = this.pregnancyOrThrow(pregnancyId, 'clinical.write');
+    if (g.status !== 'active') throw new Error('Labour observations require an ongoing pregnancy');
+    const at = obs.observed_at || nowIso();
+    if (new Date(at).getTime() > Date.now() + 5 * 60_000) throw new Error('Observation time cannot be in the future');
+    if ((gaDaysOn(g, at.slice(0, 10)) ?? 0) < 140) throw new Error('Labour observations require GA of at least 20 weeks');
+    const clinicId = obs.clinic_id || g.clinic_id;
+    this.assertMember(clinicId);
+    const { clinic_id: _c, ...rest } = obs;
+    this.labour.push({
+      cervical_dilation_cm: null, descent_fifths: null, contractions_per_10min: null, contraction_duration_s: null, fhr: null,
+      liquor: null, moulding: null, bp_systolic: null, bp_diastolic: null, pulse: null, temperature_c: null, oxytocin_mu_min: null,
+      notes: null, ...rest, observed_at: at, id: crypto.randomUUID(), pregnancy_id: g.id, patient_id: g.patient_id, clinic_id: clinicId,
+      entered_in_error: false, recorded_by: this.currentId, created_at: nowIso(),
+    });
+    this.log('INSERT', 'labour_observations', g.patient_id);
+  }
+
+  async markLabourObservationError(id: string) {
+    const o = this.labour.find((x) => x.id === id);
+    if (!o) throw new Forbidden();
+    this.patientOrThrow(o.patient_id, 'clinical.write');
+    o.entered_in_error = true;
+    this.log('UPDATE', 'labour_observations', o.patient_id, { changed_fields: ['entered_in_error'] });
   }
 }

@@ -106,7 +106,13 @@ export interface Pregnancy {
   booking_date: string | null;
   booking_weight_kg: number | null;
   height_cm: number | null;
+  chorionicity: Chorionicity | null;
+  previous_cs_count: number | null;
+  high_risk_plan: string | null;
+  current_medications: string | null;
 }
+
+export type Chorionicity = 'dcda' | 'mcda' | 'mcma' | 'tcta' | 'dcta' | 'mcta' | 'other';
 
 export type PregnancyStatus = 'active' | 'delivered' | 'miscarriage' | 'ectopic' | 'termination' | 'stillbirth';
 export type PregnancyInput = Omit<Pregnancy, 'id'>;
@@ -273,6 +279,9 @@ export interface AntenatalVisit {
   edema: Edema | null;
   hemoglobin_g_dl: number | null;
   notes: string | null;
+  fhr_by_fetus: number[] | null;
+  presentation_by_fetus: Presentation[] | null;
+  next_visit_date: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -341,7 +350,111 @@ export interface PregnancyDetail {
   delivery: Delivery | null;
   newborns: Newborn[];
   fetal_assessments: FetalAssessment[];
+  biometry: FetalBiometry[];
+  postnatal_visits: PostnatalVisitRow[];
+  labour: LabourObservation[];
 }
+
+export type UaEdf = 'present' | 'absent' | 'reversed';
+export type PlacentaLocation = 'anterior' | 'posterior' | 'fundal' | 'lateral' | 'low_lying' | 'previa';
+
+export interface FetalBiometry {
+  id: string;
+  fetal_assessment_id: string;
+  pregnancy_id: string;
+  patient_id: string;
+  clinic_id: string;
+  fetus_label: string;
+  ga_days: number | null;
+  crl_mm: number | null;
+  bpd_mm: number | null;
+  hc_mm: number | null;
+  ac_mm: number | null;
+  fl_mm: number | null;
+  efw_g: number | null;
+  afi_cm: number | null;
+  dvp_cm: number | null;
+  ua_pi: number | null;
+  ua_edf: UaEdf | null;
+  mca_pi: number | null;
+  fhr: number | null;
+  presentation: Presentation | null;
+  placenta_location: PlacentaLocation | null;
+  notes: string | null;
+}
+
+export type FetalBiometryInput = Partial<Omit<FetalBiometry,
+  'id' | 'fetal_assessment_id' | 'pregnancy_id' | 'patient_id' | 'clinic_id' | 'ga_days'>> & { fetus_label: string };
+
+export interface FetalScanInput {
+  performed_at: string;
+  assessment_type: string;
+  impression: string | null;
+  clinic_id?: string | null;
+}
+
+export interface PostnatalVisit {
+  id: string;
+  delivery_id: string;
+  pregnancy_id: string;
+  patient_id: string;
+  clinic_id: string;
+  encounter_id: string;
+  visit_date: string;
+  days_postpartum: number | null;
+  bp_systolic: number | null;
+  bp_diastolic: number | null;
+  pulse: number | null;
+  temperature_c: number | null;
+  uterus: 'well_contracted' | 'subinvolution' | 'tender' | null;
+  lochia: 'normal' | 'heavy' | 'offensive' | 'absent' | null;
+  wound: 'not_applicable' | 'healing' | 'infection' | 'dehiscence' | null;
+  breastfeeding: 'exclusive' | 'mixed' | 'formula' | 'not_feeding' | null;
+  breasts: 'normal' | 'engorgement' | 'mastitis' | 'nipple_trauma' | null;
+  epds_score: number | null;
+  epds_self_harm: boolean | null;
+  hemoglobin_g_dl: number | null;
+  contraception: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type PostnatalVisitInput = Partial<Omit<PostnatalVisit,
+  'id' | 'delivery_id' | 'pregnancy_id' | 'patient_id' | 'clinic_id' | 'encounter_id' | 'days_postpartum' | 'created_by' | 'created_at'>>;
+
+export interface PostnatalVisitRow extends PostnatalVisit {
+  encounter: AntenatalVisitRow['encounter'];
+}
+
+export type Liquor = 'intact' | 'clear' | 'meconium_light' | 'meconium_thick' | 'blood_stained' | 'absent';
+
+export interface LabourObservation {
+  id: string;
+  pregnancy_id: string;
+  patient_id: string;
+  clinic_id: string;
+  observed_at: string;
+  cervical_dilation_cm: number | null;
+  descent_fifths: number | null;
+  contractions_per_10min: number | null;
+  contraction_duration_s: number | null;
+  fhr: number | null;
+  liquor: Liquor | null;
+  moulding: number | null;
+  bp_systolic: number | null;
+  bp_diastolic: number | null;
+  pulse: number | null;
+  temperature_c: number | null;
+  oxytocin_mu_min: number | null;
+  notes: string | null;
+  entered_in_error: boolean;
+  recorded_by: string | null;
+  created_at: string;
+}
+
+export type LabourObservationInput = Partial<Omit<LabourObservation,
+  'id' | 'pregnancy_id' | 'patient_id' | 'clinic_id' | 'entered_in_error' | 'recorded_by' | 'created_at'>> & { clinic_id?: string | null };
 
 export interface ObstetricWorklistRow {
   pregnancy_id: string;

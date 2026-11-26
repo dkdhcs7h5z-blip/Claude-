@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { DataService, AuthUser } from './service';
 import type {
+  FetalBiometry, LabourObservation, PostnatalVisitRow,
   AntenatalVisitRow, Delivery, FetalAssessment, Newborn, ObstetricWorklistRow, Pregnancy,
   AccessGrant, AuditEvent, Clinic, DashboardStats, DocumentMeta, MyAccess, Patient,
   PatientClinical, Profile, ResearchProject, StaffMember,
@@ -258,12 +259,15 @@ export class SupabaseService implements DataService {
   async getPregnancyDetail(pregnancyId: string) {
     const pregnancy = check(await this.sb.from('pregnancies').select('*').eq('id', pregnancyId).maybeSingle()) as Pregnancy | null;
     if (!pregnancy) return null;
-    const [visits, delivery, fetal] = await Promise.all([
+    const [visits, delivery, fetal, biometry, postnatal, labour] = await Promise.all([
       this.sb.from('antenatal_visits')
         .select('*, encounter:encounters!antenatal_visits_encounter_id_fkey(id, status, provider_id, is_private, assessment, plan, chief_complaint, signed_by, signed_at)')
         .eq('pregnancy_id', pregnancyId).order('visit_date').order('created_at'),
       this.sb.from('deliveries').select('*').eq('pregnancy_id', pregnancyId).maybeSingle(),
       this.sb.from('fetal_assessments').select('*').eq('patient_id', pregnancy.patient_id).order('performed_at'),
+      this.sb.from('fetal_biometry').select('*').eq('pregnancy_id', pregnancyId).order('ga_days'),
+      this.sb.from('postnatal_visits').select('*, encounter:encounters!postnatal_visits_encounter_id_fkey(id, status, provider_id, is_private, assessment, plan, chief_complaint, signed_by, signed_at)').eq('pregnancy_id', pregnancyId).order('visit_date'),
+      this.sb.from('labour_observations').select('*').eq('pregnancy_id', pregnancyId).order('observed_at'),
     ]);
     const del = check(delivery) as Delivery | null;
     const newborns = del
@@ -275,6 +279,9 @@ export class SupabaseService implements DataService {
       delivery: del,
       newborns,
       fetal_assessments: (check(fetal) as FetalAssessment[]).filter((f) => !f.pregnancy_id || f.pregnancy_id === pregnancyId),
+      biometry: check(biometry) as FetalBiometry[],
+      postnatal_visits: check(postnatal) as PostnatalVisitRow[],
+      labour: check(labour) as LabourObservation[],
     };
   }
 
@@ -306,5 +313,22 @@ export class SupabaseService implements DataService {
     return check(await this.sb.rpc('record_delivery', {
       p_pregnancy_id: pregnancyId, p_delivery: delivery, p_newborns: newborns,
     })) as string;
+  }
+
+  async recordFetalScan(pregnancyId: string, scan: Parameters<DataService['recordFetalScan']>[1], fetuses: Parameters<DataService['recordFetalScan']>[2]) {
+    return check(await this.sb.rpc('record_fetal_scan', { p_pregnancy_id: pregnancyId, p_scan: scan, p_fetuses: fetuses })) as string;
+  }
+
+  async recordPostnatalVisit(deliveryId: string, visit: Parameters<DataService['recordPostnatalVisit']>[1], narrative: Parameters<DataService['recordPostnatalVisit']>[2]) {
+    return check(await this.sb.rpc('record_postnatal_visit', { p_delivery_id: deliveryId, p_visit: visit, p_encounter: narrative })) as string;
+  }
+
+  async addLabourObservation(pregnancyId: string, obs: Parameters<DataService['addLabourObservation']>[1]) {
+    const preg = check(await this.sb.from('pregnancies').select('patient_id, clinic_id').eq('id', pregnancyId).single()) as { patient_id: string; clinic_id: string };
+    check(await this.sb.from('labour_observations').insert({ ...obs, pregnancy_id: pregnancyId, patient_id: preg.patient_id, clinic_id: obs.clinic_id || preg.clinic_id }));
+  }
+
+  async markLabourObservationError(id: string) {
+    check(await this.sb.from('labour_observations').update({ entered_in_error: true }).eq('id', id));
   }
 }
