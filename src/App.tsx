@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Route, Routes, Link } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, Route, Routes, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { RequireAuth, RequirePermission } from '@/auth/guards';
@@ -43,9 +43,12 @@ function NotFound() {
   );
 }
 
+// The sandboxed preview build cannot use path URLs, so it routes in memory.
+const Router = import.meta.env.VITE_EMBED ? MemoryRouter : BrowserRouter;
+
 export default function App() {
   return (
-    <BrowserRouter>
+    <Router>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -72,7 +75,7 @@ export default function App() {
           </Route>
         </Routes>
       </AuthProvider>
-    </BrowserRouter>
+    </Router>
   );
 }
 

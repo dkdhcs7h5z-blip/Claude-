@@ -6,6 +6,7 @@
   "description": "Women's Health, Obstetrics, Gynecology, Reproductive Medicine & Fetal Medicine Intelligence Platform",
   "scripts": {
     "dev": "vite",
+    "build:preview": "VITE_EMBED=1 VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= vite build",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
@@ -34,6 +35,7 @@
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vite-plugin-pwa": "^0.21.1",
+    "vite-plugin-singlefile": "^2.0.3",
     "vitest": "^2.1.8"
   }
 }
