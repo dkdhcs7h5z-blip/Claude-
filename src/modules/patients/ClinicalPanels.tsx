@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Lock } from 'lucide-react';
 import type { Encounter, FertilityCycle, FetalAssessment, Pregnancy } from '@/data/types';
 import { Badge, Card, EmptyState, type Tone } from '@/components/ui';
-import { eddFromLmp, formatGA, gestationalAge, gpal } from '@/clinical/obstetrics';
+import { effectiveEdd, formatGADays, gaDaysOn, gpal, trimesterOf } from '@/clinical/obstetrics';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useLang } from '@/lib/queries';
 
@@ -11,8 +11,8 @@ const riskTone: Record<Pregnancy['risk_level'], Tone> = { low: 'green', moderate
 export function PregnancyCard({ p }: { p: Pregnancy }) {
   const { t } = useTranslation();
   const lang = useLang();
-  const ga = p.status === 'active' ? gestationalAge({ lmp: p.lmp, edd: p.edd }) : null;
-  const edd = p.edd ?? (p.lmp ? eddFromLmp(p.lmp) : null);
+  const ga = p.status === 'active' ? gaDaysOn(p) : null;
+  const edd = effectiveEdd(p);
   return (
     <div className="rounded-lg border border-slate-200 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -24,27 +24,17 @@ export function PregnancyCard({ p }: { p: Pregnancy }) {
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <div><dt className="text-xs text-slate-500">{t('clinical.ga')}</dt>
-          <dd className="font-semibold tabular-nums"><span className="ltr-num">{formatGA(ga)}</span>{ga && <span className="ms-1 text-xs font-normal text-slate-500">{t('clinical.trimester', { n: ga.trimester })}</span>}</dd></div>
+          <dd className="font-semibold tabular-nums"><span className="ltr-num">{formatGADays(ga)}</span>{ga != null && <span className="ms-1 text-xs font-normal text-slate-500">{t('clinical.trimester', { n: trimesterOf(ga) })}</span>}</dd></div>
         <div><dt className="text-xs text-slate-500">{t('clinical.edd')}</dt><dd className="font-medium">{formatDate(edd, lang)}</dd></div>
         <div><dt className="text-xs text-slate-500">{t('clinical.gpal')}</dt><dd className="font-medium"><span className="ltr-num">{gpal(p)}</span></dd></div>
         <div><dt className="text-xs text-slate-500">{t('clinical.plurality')}</dt><dd className="font-medium">{p.plurality}{p.conception ? ` · ${t(`clinical.conceptionType.${p.conception}`, p.conception)}` : ''}</dd></div>
       </dl>
       {p.risk_factors.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">
-          {p.risk_factors.map((r) => <Badge key={r} tone="amber">{r}</Badge>)}
+          {p.risk_factors.map((r) => <Badge key={r} tone="amber">{t(`ob.riskFactors.${r}`, r)}</Badge>)}
         </div>
       )}
     </div>
-  );
-}
-
-export function PregnanciesPanel({ items }: { items: Pregnancy[] }) {
-  const { t } = useTranslation();
-  return (
-    <Card title={t('clinical.pregnancy')}>
-      {items.length ? <div className="space-y-3">{items.map((p) => <PregnancyCard key={p.id} p={p} />)}</div>
-        : <EmptyState title={t('clinical.noPregnancies')} />}
-    </Card>
   );
 }
 

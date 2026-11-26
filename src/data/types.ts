@@ -95,10 +95,21 @@ export interface Pregnancy {
   plurality: number;
   risk_level: 'low' | 'moderate' | 'high';
   risk_factors: string[];
-  status: 'active' | 'delivered' | 'miscarriage' | 'ectopic' | 'termination' | 'stillbirth';
+  status: PregnancyStatus;
   outcome_date: string | null;
   notes: string | null;
+  cycle_length_days: number;
+  us_dating_date: string | null;
+  us_dating_ga_days: number | null;
+  transfer_date: string | null;
+  embryo_age_days: 3 | 5 | 6 | null;
+  booking_date: string | null;
+  booking_weight_kg: number | null;
+  height_cm: number | null;
 }
+
+export type PregnancyStatus = 'active' | 'delivered' | 'miscarriage' | 'ectopic' | 'termination' | 'stillbirth';
+export type PregnancyInput = Omit<Pregnancy, 'id'>;
 
 export interface FertilityCycle {
   id: string;
@@ -233,4 +244,130 @@ export interface PatientQuery {
   specialty?: Specialty | 'all';
   clinicId?: string | null;
   limit?: number;
+}
+
+// --- Obstetrics -----------------------------------------------------------------
+export type UrineDip = 'negative' | 'trace' | '1+' | '2+' | '3+' | '4+';
+export type Presentation = 'cephalic' | 'breech' | 'transverse' | 'oblique' | 'unstable' | 'not_assessed';
+export type FetalMovements = 'normal' | 'reduced' | 'absent' | 'not_assessed';
+export type Edema = 'none' | 'mild' | 'moderate' | 'severe';
+
+export interface AntenatalVisit {
+  id: string;
+  pregnancy_id: string;
+  patient_id: string;
+  clinic_id: string;
+  encounter_id: string;
+  visit_date: string;
+  ga_days: number | null;
+  weight_kg: number | null;
+  bp_systolic: number | null;
+  bp_diastolic: number | null;
+  pulse: number | null;
+  urine_protein: UrineDip | null;
+  urine_glucose: UrineDip | null;
+  fundal_height_cm: number | null;
+  fetal_heart_rate: number | null;
+  presentation: Presentation | null;
+  fetal_movements: FetalMovements | null;
+  edema: Edema | null;
+  hemoglobin_g_dl: number | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type AntenatalVisitInput = Partial<Omit<AntenatalVisit,
+  'id' | 'pregnancy_id' | 'patient_id' | 'clinic_id' | 'encounter_id' | 'ga_days' | 'created_by' | 'created_at'>>;
+
+/** Visit joined with its encounter (status, provider, narrative). */
+export interface AntenatalVisitRow extends AntenatalVisit {
+  encounter: Pick<Encounter, 'id' | 'status' | 'provider_id' | 'is_private' | 'assessment' | 'plan' | 'chief_complaint'> & {
+    signed_by: string | null; signed_at: string | null;
+  };
+}
+
+export interface EncounterNarrative {
+  chief_complaint?: string | null;
+  assessment?: string | null;
+  plan?: string | null;
+  is_private?: boolean;
+  clinic_id?: string | null;
+}
+
+export type DeliveryOnset = 'spontaneous' | 'induced' | 'prelabour_cs';
+export type DeliveryMode = 'svd' | 'vacuum' | 'forceps' | 'vaginal_breech' | 'cs_elective' | 'cs_emergency';
+export type Anesthesia = 'none' | 'epidural' | 'spinal' | 'combined_spinal_epidural' | 'general' | 'local';
+export type Perineum = 'intact' | 'first_degree' | 'second_degree' | 'third_degree' | 'fourth_degree' | 'episiotomy' | 'not_applicable';
+
+export interface Delivery {
+  id: string;
+  pregnancy_id: string;
+  patient_id: string;
+  clinic_id: string;
+  delivered_at: string;
+  ga_days: number | null;
+  onset: DeliveryOnset;
+  mode: DeliveryMode;
+  indication: string | null;
+  anesthesia: Anesthesia | null;
+  blood_loss_ml: number | null;
+  perineum: Perineum | null;
+  complications: string[];
+  notes: string | null;
+  recorded_by: string | null;
+}
+
+export type DeliveryInput = Omit<Delivery, 'id' | 'pregnancy_id' | 'patient_id' | 'clinic_id' | 'ga_days' | 'recorded_by'>;
+
+export interface Newborn {
+  id: string;
+  delivery_id: string;
+  birth_order: number;
+  sex: 'female' | 'male' | 'undetermined' | null;
+  birth_weight_g: number | null;
+  apgar_1: number | null;
+  apgar_5: number | null;
+  outcome: 'live_birth' | 'stillbirth' | 'neonatal_death';
+  nicu_admission: boolean;
+  notes: string | null;
+}
+
+export type NewbornInput = Omit<Newborn, 'id' | 'delivery_id' | 'birth_order'>;
+
+export interface PregnancyDetail {
+  pregnancy: Pregnancy;
+  visits: AntenatalVisitRow[];
+  delivery: Delivery | null;
+  newborns: Newborn[];
+  fetal_assessments: FetalAssessment[];
+}
+
+export interface ObstetricWorklistRow {
+  pregnancy_id: string;
+  patient_id: string;
+  clinic_id: string;
+  lmp: string | null;
+  edd: string | null;
+  edd_basis: Pregnancy['edd_basis'];
+  cycle_length_days: number;
+  risk_level: Pregnancy['risk_level'];
+  risk_factors: string[];
+  plurality: number;
+  gravida: number | null;
+  para: number | null;
+  conception: string | null;
+  mrn: string;
+  first_name_en: string | null;
+  last_name_en: string | null;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  date_of_birth: string;
+  rh_factor: Patient['rh_factor'];
+  last_visit_date: string | null;
+  last_bp_systolic: number | null;
+  last_bp_diastolic: number | null;
+  last_urine_protein: UrineDip | null;
+  last_fetal_movements: FetalMovements | null;
+  visit_count: number;
 }

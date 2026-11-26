@@ -1,4 +1,6 @@
 import type { Translation } from './en';
+import obAr from './ob.ar';
+
 
 const ar: Translation = {
   app: {
@@ -206,6 +208,7 @@ const ar: Translation = {
     backHome: 'العودة إلى لوحة التحكم',
   },
   pwa: { updateAvailable: 'يتوفر إصدار جديد.', reload: 'تحديث' },
+  ob: obAr,
 };
 
 export default ar;

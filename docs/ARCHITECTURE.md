@@ -39,6 +39,7 @@
 | Authorization | `permissions`, `role_permissions`, `patient_access_grants` |
 | Patients | `patients` (bilingual names, demographics, visibility, consent, soft delete) |
 | Clinical core | `encounters` (all specialties; draft → signed → amended), `pregnancies`, `fertility_cycles`, `fetal_assessments` |
+| Obstetrics | `pregnancies` (dating & booking fields), `antenatal_visits` (1:1 with an encounter), `deliveries`, `newborns`; view `obstetric_worklist` |
 | Documents | `documents` (metadata, SHA-256, private flag) + storage bucket |
 | Research | `research_projects` (IRB), `research_project_members`, `research_enrollments` (pseudonymous subject codes) |
 | Accountability | `audit_log` (append-only) |
@@ -55,6 +56,7 @@ Specialty-specific structured data that is still evolving lives in `jsonb` colum
 | `…0004_authorization_rls.sql` | helper functions, integrity triggers, RLS policies |
 | `…0005_audit_and_rpc.sql` | audit log + triggers; RPCs `get_my_access`, `dashboard_stats`, `log_access_event`, `request_emergency_access`, `research_cohort` |
 | `…0006_storage.sql` | private bucket and object policies |
+| `…0007_obstetrics.sql` | dating fields, antenatal visits, deliveries, newborns, worklist view; RPCs `record_antenatal_visit`, `record_delivery` |
 
 **Rule for new migrations:** every new table must `enable row level security`, `revoke all … from anon`, get explicit policies, and get an `_audit` trigger. Add cases to `supabase/tests/rls_tests.sql`.
 

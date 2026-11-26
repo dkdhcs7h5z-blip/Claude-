@@ -1,4 +1,6 @@
 import type {
+  AntenatalVisitInput, DeliveryInput, EncounterNarrative, NewbornInput, ObstetricWorklistRow, Pregnancy,
+  PregnancyDetail, PregnancyInput,
   AccessGrant, AccessLevel, AuditEvent, Clinic, DashboardStats, DocumentCategory, DocumentMeta,
   MyAccess, Patient, PatientClinical, PatientInput, PatientQuery, Profile, ResearchProject, StaffMember,
 } from './types';
@@ -77,4 +79,16 @@ export interface DataService {
 
   // --- research -----------------------------------------------------------
   listResearchProjects(): Promise<ResearchProject[]>;
+
+  // --- obstetrics ------------------------------------------------------------
+  listObstetricWorklist(clinicId?: string | null): Promise<ObstetricWorklistRow[]>;
+  getPregnancyDetail(pregnancyId: string): Promise<PregnancyDetail | null>;
+  createPregnancy(input: PregnancyInput): Promise<Pregnancy>;
+  updatePregnancy(id: string, patch: Partial<PregnancyInput>): Promise<Pregnancy>;
+  /** Creates the draft obstetric encounter + typed vitals atomically. Returns the visit id. */
+  recordAntenatalVisit(pregnancyId: string, visit: AntenatalVisitInput, narrative: EncounterNarrative): Promise<string>;
+  updateAntenatalVisit(visitId: string, encounterId: string, visit: AntenatalVisitInput, narrative: EncounterNarrative): Promise<void>;
+  signEncounter(encounterId: string): Promise<void>;
+  /** Records delivery + newborns atomically and closes the pregnancy. Returns the delivery id. */
+  recordDelivery(pregnancyId: string, delivery: DeliveryInput & { clinic_id?: string | null }, newborns: NewbornInput[]): Promise<string>;
 }

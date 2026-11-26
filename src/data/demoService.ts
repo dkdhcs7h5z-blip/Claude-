@@ -1,13 +1,16 @@
 import type { DataService, AuthUser } from './service';
 import type {
-  AccessGrant, AuditEvent, DocumentMeta, MyAccess, Patient, PatientInput, Profile, StaffMember,
+  AccessGrant, AntenatalVisit, AntenatalVisitRow, AuditEvent, Delivery, DocumentMeta, Encounter, MyAccess, Newborn,
+  ObstetricWorklistRow, Patient, PatientInput, Pregnancy, Profile, StaffMember,
 } from './types';
+import { gaDaysOn, todayIso } from '@/clinical/obstetrics';
 import type { Permission } from '@/rbac/permissions';
 import { ROLE_PERMISSIONS } from '@/rbac/permissions';
 import { hasPermission, hasPermissionAnywhere, patientCan } from '@/rbac/access';
 import {
   DEMO_CLINICS, DEMO_CYCLES, DEMO_DOCUMENTS, DEMO_ENCOUNTERS, DEMO_FETAL, DEMO_GRANTS, DEMO_PATIENTS,
   DEMO_PREGNANCIES, DEMO_RESEARCH, DEMO_RESEARCH_MEMBERS, DEMO_USERS, seedAudit, type DemoUser,
+  DEMO_VISITS, DEMO_VISIT_ENCOUNTERS, DEMO_DELIVERIES, DEMO_NEWBORNS,
 } from './demoData';
 import { buildStoragePath, MAX_UPLOAD_BYTES } from '@/lib/files';
 
@@ -38,7 +41,13 @@ export class DemoService implements DataService {
   private pregnancies = clone(DEMO_PREGNANCIES);
   private cycles = clone(DEMO_CYCLES);
   private fetal = clone(DEMO_FETAL);
-  private encounters = clone(DEMO_ENCOUNTERS);
+  private encounters: Encounter[] = clone([...DEMO_ENCOUNTERS, ...DEMO_VISIT_ENCOUNTERS]);
+  private visits: AntenatalVisit[] = clone(DEMO_VISITS);
+  private deliveries: Delivery[] = clone(DEMO_DELIVERIES);
+  private newborns: Newborn[] = clone(DEMO_NEWBORNS);
+  private signatures = new Map<string, { by: string; at: string }>(
+    DEMO_VISIT_ENCOUNTERS.filter((e) => e.status === 'signed').map((e) => [e.id, { by: e.provider_id, at: e.encounter_at }]),
+  );
   private documents: DocumentMeta[] = clone(DEMO_DOCUMENTS);
   private grants: AccessGrant[] = clone(DEMO_GRANTS);
   private audit: AuditEvent[] = seedAudit();
@@ -405,5 +414,188 @@ export class DemoService implements DataService {
     return clone(DEMO_RESEARCH.filter((r) => a.is_super_admin || r.principal_investigator_id === a.user_id
       || (hasPermissionAnywhere(a, 'research.access')
         && DEMO_RESEARCH_MEMBERS.some((m) => m.project_id === r.id && m.user_id === a.user_id))));
+  }
+
+  // --- obstetrics -------------------------------------------------------------------
+  private encounterVisible(e: Encounter) {
+    return !e.is_private || e.provider_id === this.currentId || this.emergency(e.patient_id);
+  }
+
+  private pregnancyOrThrow(id: string, perm: Permission) {
+    const g = this.pregnancies.find((x) => x.id === id);
+    if (!g) throw new Error('Pregnancy not found');
+    this.patientOrThrow(g.patient_id, perm);
+    return g;
+  }
+
+  private assertMember(clinicId: string) {
+    const a = this.access();
+    if (!a?.is_super_admin && !a?.memberships.some((m) => m.clinic_id === clinicId)) throw new Forbidden();
+  }
+
+  async listObstetricWorklist(clinicId?: string | null): Promise<ObstetricWorklistRow[]> {
+    await delay();
+    return this.pregnancies
+      .filter((g) => g.status === 'active' && (!clinicId || g.clinic_id === clinicId))
+      .flatMap((g) => {
+        const p = this.patients.find((x) => x.id === g.patient_id);
+        if (!p || p.deleted_at || !this.can(p, 'clinical.read')) return [];
+        const visits = this.visits
+          .filter((v) => v.pregnancy_id === g.id && this.encounterVisible(this.encounters.find((e) => e.id === v.encounter_id)!))
+          .sort((a, b) => a.visit_date.localeCompare(b.visit_date));
+        const last = visits[visits.length - 1];
+        return [{
+          pregnancy_id: g.id, patient_id: p.id, clinic_id: g.clinic_id, lmp: g.lmp, edd: g.edd, edd_basis: g.edd_basis,
+          cycle_length_days: g.cycle_length_days, risk_level: g.risk_level, risk_factors: g.risk_factors, plurality: g.plurality,
+          gravida: g.gravida, para: g.para, conception: g.conception, mrn: p.mrn, first_name_en: p.first_name_en,
+          last_name_en: p.last_name_en, first_name_ar: p.first_name_ar, last_name_ar: p.last_name_ar,
+          date_of_birth: p.date_of_birth, rh_factor: p.rh_factor, last_visit_date: last?.visit_date ?? null,
+          last_bp_systolic: last?.bp_systolic ?? null, last_bp_diastolic: last?.bp_diastolic ?? null,
+          last_urine_protein: last?.urine_protein ?? null, last_fetal_movements: last?.fetal_movements ?? null,
+          visit_count: visits.length,
+        }];
+      });
+  }
+
+  async getPregnancyDetail(id: string) {
+    await delay(80);
+    const g = this.pregnancies.find((x) => x.id === id);
+    const p = g && this.patients.find((x) => x.id === g.patient_id);
+    if (!g || !p || !this.can(p, 'clinical.read')) return null;
+    const visits: AntenatalVisitRow[] = this.visits
+      .filter((v) => v.pregnancy_id === id)
+      .map((v) => ({ v, e: this.encounters.find((e) => e.id === v.encounter_id)! }))
+      .filter(({ e }) => this.encounterVisible(e))
+      .sort((a, b) => a.v.visit_date.localeCompare(b.v.visit_date) || a.v.created_at.localeCompare(b.v.created_at))
+      .map(({ v, e }) => ({
+        ...v,
+        encounter: {
+          id: e.id, status: e.status, provider_id: e.provider_id, is_private: e.is_private, assessment: e.assessment,
+          plan: e.plan, chief_complaint: e.chief_complaint,
+          signed_by: this.signatures.get(e.id)?.by ?? null, signed_at: this.signatures.get(e.id)?.at ?? null,
+        },
+      }));
+    const delivery = this.deliveries.find((d) => d.pregnancy_id === id) ?? null;
+    return clone({
+      pregnancy: g,
+      visits,
+      delivery,
+      newborns: delivery ? this.newborns.filter((n) => n.delivery_id === delivery.id) : [],
+      fetal_assessments: this.fetal.filter((f) => f.patient_id === g.patient_id && (!f.pregnancy_id || f.pregnancy_id === id)),
+    });
+  }
+
+  private validatePregnancy(g: Omit<Pregnancy, 'id'>, selfId?: string) {
+    if (g.status === 'active' && !g.lmp && !g.edd) throw new Error('An ongoing pregnancy must be dated (LMP or EDD)');
+    if (g.gravida != null && (g.para ?? 0) + (g.abortus ?? 0) > g.gravida) throw new Error('GPAL inconsistent: P + A must not exceed G');
+    if (g.status === 'active' && this.pregnancies.some((x) => x.patient_id === g.patient_id && x.status === 'active' && x.id !== selfId)) {
+      throw new Error('This patient already has an ongoing pregnancy');
+    }
+  }
+
+  async createPregnancy(input: Omit<Pregnancy, 'id'>) {
+    await delay();
+    this.patientOrThrow(input.patient_id, 'clinical.write');
+    this.assertMember(input.clinic_id);
+    this.validatePregnancy(input);
+    const g: Pregnancy = { ...input, id: crypto.randomUUID() };
+    this.pregnancies.push(g);
+    const pt = this.patients.find((x) => x.id === g.patient_id)!;
+    if (!pt.specialties.includes('obstetrics')) pt.specialties = [...pt.specialties, 'obstetrics'];
+    this.log('INSERT', 'pregnancies', g.patient_id);
+    return clone(g);
+  }
+
+  async updatePregnancy(id: string, patch: Partial<Omit<Pregnancy, 'id'>>) {
+    await delay();
+    const g = this.pregnancyOrThrow(id, 'clinical.write');
+    const next = { ...g, ...patch, id: g.id, patient_id: g.patient_id };
+    this.validatePregnancy(next, id);
+    Object.assign(g, next);
+    this.log('UPDATE', 'pregnancies', g.patient_id, { changed_fields: Object.keys(patch) });
+    return clone(g);
+  }
+
+  private validateVisit(v: Partial<AntenatalVisit>) {
+    if ((v.bp_systolic == null) !== (v.bp_diastolic == null)) throw new Error('Enter both systolic and diastolic pressure');
+    if (v.bp_systolic != null && v.bp_diastolic != null && v.bp_systolic <= v.bp_diastolic) {
+      throw new Error('Systolic pressure must be higher than diastolic');
+    }
+    if (v.visit_date && v.visit_date > todayIso()) throw new Error('Visit date cannot be in the future');
+  }
+
+  async recordAntenatalVisit(pregnancyId: string, visit: Parameters<DataService['recordAntenatalVisit']>[1], narrative: Parameters<DataService['recordAntenatalVisit']>[2]) {
+    await delay();
+    const g = this.pregnancyOrThrow(pregnancyId, 'clinical.write');
+    if (g.status !== 'active') throw new Error('Visits can only be recorded for an ongoing pregnancy');
+    const clinicId = narrative.clinic_id || g.clinic_id;
+    this.assertMember(clinicId);
+    const date = visit.visit_date || todayIso();
+    this.validateVisit({ ...visit, visit_date: date });
+    const encId = crypto.randomUUID();
+    this.encounters.push({
+      id: encId, patient_id: g.patient_id, clinic_id: clinicId, specialty: 'obstetrics', encounter_type: 'antenatal_visit',
+      encounter_at: date === todayIso() ? nowIso() : `${date}T00:00:00.000Z`, provider_id: this.currentId!,
+      is_private: narrative.is_private ?? false, status: 'draft', chief_complaint: narrative.chief_complaint ?? null,
+      assessment: narrative.assessment ?? null, plan: narrative.plan ?? null,
+    });
+    const id = crypto.randomUUID();
+    this.visits.push({
+      id, pregnancy_id: g.id, patient_id: g.patient_id, clinic_id: clinicId, encounter_id: encId, visit_date: date,
+      ga_days: gaDaysOn(g, date), weight_kg: null, bp_systolic: null, bp_diastolic: null, pulse: null, urine_protein: null,
+      urine_glucose: null, fundal_height_cm: null, fetal_heart_rate: null, presentation: null, fetal_movements: null,
+      edema: null, hemoglobin_g_dl: null, notes: null, ...visit, created_by: this.currentId, created_at: nowIso(),
+    });
+    this.log('INSERT', 'antenatal_visits', g.patient_id);
+    return id;
+  }
+
+  async updateAntenatalVisit(visitId: string, encounterId: string, visit: Parameters<DataService['updateAntenatalVisit']>[2], narrative: Parameters<DataService['updateAntenatalVisit']>[3]) {
+    await delay();
+    const v = this.visits.find((x) => x.id === visitId);
+    const e = this.encounters.find((x) => x.id === encounterId);
+    if (!v || !e || v.encounter_id !== e.id) throw new Forbidden();
+    this.patientOrThrow(v.patient_id, 'clinical.write');
+    if (e.is_private && e.provider_id !== this.currentId) throw new Forbidden();
+    if (e.status !== 'draft') throw new Error('This visit is signed; record an amendment instead');
+    const merged = { ...v, ...visit };
+    this.validateVisit(merged);
+    const g = this.pregnancies.find((x) => x.id === v.pregnancy_id)!;
+    Object.assign(v, visit, { ga_days: gaDaysOn(g, merged.visit_date) });
+    Object.assign(e, { chief_complaint: narrative.chief_complaint ?? e.chief_complaint, assessment: narrative.assessment ?? e.assessment, plan: narrative.plan ?? e.plan });
+    this.log('UPDATE', 'antenatal_visits', v.patient_id, { changed_fields: Object.keys(visit) });
+  }
+
+  async signEncounter(encounterId: string) {
+    await delay();
+    const e = this.encounters.find((x) => x.id === encounterId);
+    if (!e) throw new Forbidden();
+    this.patientOrThrow(e.patient_id, 'clinical.write');
+    if (!hasPermission(this.access(), 'clinical.sign', e.clinic_id)) throw new Forbidden('Signing requires the clinical.sign permission');
+    if (e.status !== 'draft') throw new Error('Only draft encounters can be signed');
+    e.status = 'signed';
+    this.signatures.set(e.id, { by: this.currentId!, at: nowIso() });
+    this.log('UPDATE', 'encounters', e.patient_id, { changed_fields: ['signed_at', 'signed_by', 'status'] });
+  }
+
+  async recordDelivery(pregnancyId: string, delivery: Parameters<DataService['recordDelivery']>[1], newborns: Parameters<DataService['recordDelivery']>[2]) {
+    await delay();
+    const g = this.pregnancyOrThrow(pregnancyId, 'clinical.write');
+    if (g.status !== 'active') throw new Error('Only an ongoing pregnancy can be delivered');
+    if (newborns.length !== g.plurality) throw new Error(`Number of newborns (${newborns.length}) does not match plurality (${g.plurality})`);
+    if (new Date(delivery.delivered_at) > new Date()) throw new Error('Delivery time cannot be in the future');
+    if (delivery.onset === 'prelabour_cs' && !delivery.mode.startsWith('cs_')) throw new Error('Pre-labour CS must be a caesarean mode');
+    const ga = gaDaysOn(g, delivery.delivered_at.slice(0, 10));
+    if (ga == null || ga < 140) throw new Error('A delivery record requires gestational age ≥ 20 weeks; record a pregnancy loss instead');
+    const clinicId = delivery.clinic_id || g.clinic_id;
+    this.assertMember(clinicId);
+    const id = crypto.randomUUID();
+    const { clinic_id: _c, ...rest } = delivery;
+    this.deliveries.push({ ...rest, id, pregnancy_id: g.id, patient_id: g.patient_id, clinic_id: clinicId, ga_days: ga, recorded_by: this.currentId });
+    newborns.forEach((n, i) => this.newborns.push({ ...n, id: crypto.randomUUID(), delivery_id: id, birth_order: i + 1 }));
+    g.status = 'delivered';
+    g.outcome_date = delivery.delivered_at.slice(0, 10);
+    this.log('INSERT', 'deliveries', g.patient_id);
+    return id;
   }
 }

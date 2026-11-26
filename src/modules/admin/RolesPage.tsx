@@ -11,7 +11,7 @@ export function RolesPage() {
     <div>
       <PageHeader title={t('admin.rolesTitle')} subtitle={t('admin.rolesSubtitle')} />
       <Card bodyClassName="p-0">
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50">
               <tr>

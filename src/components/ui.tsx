@@ -76,12 +76,16 @@ export function Badge({ tone = 'slate', children, icon }: { tone?: Tone; childre
 export function Field({ label, help, error, required, children, htmlFor }: {
   label: ReactNode; help?: ReactNode; error?: ReactNode; required?: boolean; children: ReactNode; htmlFor?: string;
 }) {
+  // Wrapping the control in its <label> associates them for screen readers and
+  // makes the label clickable, without every caller having to wire ids.
+  const caption = <>{label}{required && <span className="text-red-600"> *</span>}</>;
   return (
     <div>
-      <label className="label" htmlFor={htmlFor}>
-        {label}{required && <span className="text-red-600"> *</span>}
-      </label>
-      {children}
+      {htmlFor ? (
+        <><label className="label" htmlFor={htmlFor}>{caption}</label>{children}</>
+      ) : (
+        <label className="block"><span className="label">{caption}</span>{children}</label>
+      )}
       {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : help ? <p className="mt-1 text-xs text-slate-500">{help}</p> : null}
     </div>
   );
@@ -207,8 +211,8 @@ export function Tabs<T extends string>({ tabs, value, onChange }: {
 }
 
 // --- Modal -----------------------------------------------------------------------------
-export function Modal({ open, onClose, title, children, footer }: {
-  open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode;
+export function Modal({ open, onClose, title, children, footer, wide = false }: {
+  open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode; wide?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -220,13 +224,13 @@ export function Modal({ open, onClose, title, children, footer }: {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:max-w-lg sm:rounded-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        className={clsx('max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:rounded-2xl', wide ? 'sm:max-w-2xl' : 'sm:max-w-lg')}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
           <h2 className="text-base font-semibold">{title}</h2>
           <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <div className="space-y-4 px-5 py-4">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">{footer}</div>}
+        {footer && <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white px-5 py-3">{footer}</div>}
       </div>
     </div>
   );

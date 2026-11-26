@@ -46,7 +46,7 @@ export function StaffPage() {
 
       <Card bodyClassName="p-0">
         {staff.isLoading ? <Spinner /> : !staff.data?.length ? <EmptyState title={t('common.noResults')} /> : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-100">
               <thead className="bg-slate-50">
                 <tr>

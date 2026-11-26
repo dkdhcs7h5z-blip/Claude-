@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Archive, ArrowLeft, Lock, Pencil, ShieldAlert, Droplet } from 'lucide-react';
@@ -13,7 +13,8 @@ import type { Patient, Specialty } from '@/data/types';
 import { ageInYears } from '@/clinical/obstetrics';
 import { clinicName, formatDate, patientName, profileName } from '@/lib/format';
 import { useClinics, useLang, useProfiles } from '@/lib/queries';
-import { CyclesPanel, EncountersPanel, FetalPanel, PregnanciesPanel, PregnancyCard } from './ClinicalPanels';
+import { CyclesPanel, EncountersPanel, FetalPanel, PregnancyCard } from './ClinicalPanels';
+import { ObstetricsTab } from '@/modules/obstetrics/ObstetricsTab';
 import { DocumentsTab } from './DocumentsTab';
 import { EmergencyAccessButton, SharingTab } from './SharingTab';
 import { AuditTable } from '@/modules/admin/AuditTable';
@@ -58,7 +59,9 @@ export function PatientDetailPage() {
   const qc = useQueryClient();
   const { access, can } = useAuth();
   const clinics = useClinics();
-  const [tab, setTab] = useState<TabId>('overview');
+  const [params, setParams] = useSearchParams();
+  const tab = (params.get('tab') as TabId | null) ?? 'overview';
+  const setTab = (id: TabId) => setParams(id === 'overview' ? {} : { tab: id }, { replace: true });
 
   const patientQ = useQuery({ queryKey: ['patient', id], queryFn: () => api.getPatient(id) });
   const p = patientQ.data;
@@ -123,7 +126,7 @@ export function PatientDetailPage() {
               {p.visibility === 'private' && <Badge tone="amber" icon={<Lock className="h-3 w-3" />}>{t('patients.private')}</Badge>}
               {p.deleted_at && <Badge tone="red">{t('patients.archived')}</Badge>}
             </div>
-            {(lang === 'ar' ? p.first_name_en : p.first_name_ar) && (
+            {(p.first_name_en || p.last_name_en) && (p.first_name_ar || p.last_name_ar) && (
               <p className="text-sm text-slate-500"><bdi>{patientName(p, lang === 'ar' ? 'en' : 'ar')}</bdi></p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
@@ -155,7 +158,7 @@ export function PatientDetailPage() {
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === 'overview' && (
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <div className="lg:col-span-1"><Demographics p={p} /></div>
           <div className="space-y-5 lg:col-span-2">
             {allowed('clinical.read') ? (
@@ -171,7 +174,7 @@ export function PatientDetailPage() {
         </div>
       )}
 
-      {tab === 'obstetrics' && c && (<div className="space-y-5"><PregnanciesPanel items={c.pregnancies} /><EncountersPanel items={bySpecialty('obstetrics')} /></div>)}
+      {tab === 'obstetrics' && c && <ObstetricsTab patient={p} clinical={c} canWrite={allowed('clinical.write')} />}
       {tab === 'gynecology' && c && <EncountersPanel items={bySpecialty('gynecology')} />}
       {tab === 'infertility' && c && (<div className="space-y-5"><CyclesPanel items={c.fertility_cycles} /><EncountersPanel items={bySpecialty('infertility')} /></div>)}
       {tab === 'fetal_medicine' && c && (<div className="space-y-5"><FetalPanel items={c.fetal_assessments} /><EncountersPanel items={bySpecialty('fetal_medicine')} /></div>)}

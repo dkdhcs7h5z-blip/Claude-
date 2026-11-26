@@ -17,7 +17,7 @@ export function AuditTable({ events, showPatient = true }: { events: AuditEvent[
   const { byId } = useProfiles();
   if (!events.length) return <EmptyState icon={<ScrollText className="h-10 w-10" />} title={t('audit.none')} />;
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="min-w-full divide-y divide-slate-100">
         <thead className="bg-slate-50">
           <tr>

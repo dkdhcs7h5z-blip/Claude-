@@ -1,5 +1,6 @@
 /* Fictional sample data for DEMO MODE only. No real persons or organizations. */
 import type {
+  AntenatalVisit, Delivery, Newborn,
   AccessGrant, AuditEvent, Clinic, DocumentMeta, Encounter, FertilityCycle, FetalAssessment,
   Patient, Pregnancy, Profile, ResearchProject,
 } from './types';
@@ -92,22 +93,33 @@ export const DEMO_PATIENTS: Patient[] = [
     specialties: ['gynecology'], marital_status: 'single' }, 5),
 ];
 
+const pregDefaults = {
+  cycle_length_days: 28, us_dating_date: null, us_dating_ga_days: null, transfer_date: null, embryo_age_days: null,
+  booking_date: null, booking_weight_kg: null, height_cm: null, outcome_date: null, notes: null,
+} as const;
+
 export const DEMO_PREGNANCIES: Pregnancy[] = [
-  { id: 'g1', patient_id: 'p1', clinic_id: 'c-main', lmp: dateAgo(168), edd: null, edd_basis: 'lmp', gravida: 2, para: 1,
+  { ...pregDefaults, id: 'g1', patient_id: 'p1', clinic_id: 'c-main', lmp: dateAgo(168), edd: null, edd_basis: 'lmp', gravida: 2, para: 1,
     abortus: 0, living: 1, conception: 'spontaneous', plurality: 1, risk_level: 'high',
-    risk_factors: ['Rh negative', 'previous cesarean'], status: 'active', outcome_date: null, notes: null },
-  { id: 'g2', patient_id: 'p2', clinic_id: 'c-main', lmp: dateAgo(84), edd: null, edd_basis: 'ultrasound', gravida: 1, para: 0,
-    abortus: 0, living: 0, conception: 'spontaneous', plurality: 1, risk_level: 'low', risk_factors: [], status: 'active',
-    outcome_date: null, notes: null },
-  { id: 'g3', patient_id: 'p4', clinic_id: 'c-main', lmp: dateAgo(245), edd: null, edd_basis: 'lmp', gravida: 3, para: 2,
+    risk_factors: ['previous_cs', 'rh_alloimmunization'], status: 'active', booking_date: dateAgo(112),
+    booking_weight_kg: 68, height_cm: 162 },
+  { ...pregDefaults, id: 'g2', patient_id: 'p2', clinic_id: 'c-main', lmp: dateAgo(84), edd: null, edd_basis: 'lmp', gravida: 1, para: 0,
+    abortus: 0, living: 0, conception: 'spontaneous', plurality: 1, risk_level: 'moderate', risk_factors: ['family_history_preeclampsia'],
+    status: 'active', booking_date: dateAgo(28), booking_weight_kg: 74, height_cm: 160 },
+  { ...pregDefaults, id: 'g3', patient_id: 'p4', clinic_id: 'c-main', lmp: dateAgo(245), edd: null, edd_basis: 'lmp', gravida: 3, para: 2,
     abortus: 0, living: 2, conception: 'spontaneous', plurality: 1, risk_level: 'moderate',
-    risk_factors: ['gestational diabetes'], status: 'active', outcome_date: null, notes: null },
-  { id: 'g4', patient_id: 'p7', clinic_id: 'c-ivf', lmp: null, edd: dateAgo(-200), edd_basis: 'ivf_transfer', gravida: 1,
-    para: 0, abortus: 0, living: 0, conception: 'icsi', plurality: 2, risk_level: 'high', risk_factors: ['twin pregnancy', 'ICSI'],
-    status: 'active', outcome_date: null, notes: 'DCDA twins' },
-  { id: 'g5', patient_id: 'p8', clinic_id: 'c-ivf', lmp: dateAgo(150), edd: null, edd_basis: 'ultrasound', gravida: 2, para: 1,
+    risk_factors: ['previous_gdm', 'family_history_diabetes'], status: 'active', booking_date: dateAgo(189),
+    booking_weight_kg: 82, height_cm: 158 },
+  { ...pregDefaults, id: 'g4', patient_id: 'p7', clinic_id: 'c-ivf', lmp: null, edd: dateAgo(-195), edd_basis: 'ivf_transfer', gravida: 1,
+    para: 0, abortus: 0, living: 0, conception: 'icsi', plurality: 2, risk_level: 'high', risk_factors: [],
+    status: 'active', transfer_date: dateAgo(66), embryo_age_days: 5, booking_date: dateAgo(30), booking_weight_kg: 61, height_cm: 165,
+    notes: 'DCDA twins' },
+  { ...pregDefaults, id: 'g5', patient_id: 'p8', clinic_id: 'c-ivf', lmp: dateAgo(150), edd: null, edd_basis: 'lmp', gravida: 2, para: 1,
     abortus: 0, living: 1, conception: 'spontaneous', plurality: 1, risk_level: 'high',
-    risk_factors: ['suspected fetal growth restriction'], status: 'active', outcome_date: null, notes: null },
+    risk_factors: ['smoking'], status: 'active', booking_date: dateAgo(90), booking_weight_kg: 55, height_cm: 163 },
+  { ...pregDefaults, id: 'g6', patient_id: 'p3', clinic_id: 'c-main', lmp: dateAgo(1100), edd: null, edd_basis: 'lmp', gravida: 1, para: 0,
+    abortus: 0, living: 0, conception: 'spontaneous', plurality: 1, risk_level: 'low', risk_factors: [], status: 'delivered',
+    outcome_date: dateAgo(824) },
 ];
 
 export const DEMO_CYCLES: FertilityCycle[] = [
@@ -184,3 +196,78 @@ export function seedAudit(): AuditEvent[] {
     ev(8, 5, 'u-nurse', 'INSERT', 'patients', 'p9', 'c-main'),
   ];
 }
+
+// --- Antenatal visits (generated series per pregnancy) ---------------------------
+type VisitSeed = Partial<AntenatalVisit> & { ga: number };
+const lmpOffset: Record<string, number> = { g1: 168, g2: 84, g3: 245, g4: 85, g5: 150 };
+const pregPatient: Record<string, [string, string]> = {
+  g1: ['p1', 'c-main'], g2: ['p2', 'c-main'], g3: ['p4', 'c-main'], g4: ['p7', 'c-ivf'], g5: ['p8', 'c-ivf'],
+};
+const visitProvider: Record<string, string> = { g1: 'u-cons', g2: 'u-res', g3: 'u-cons', g4: 'u-spec', g5: 'u-spec' };
+
+const seeds: Record<string, VisitSeed[]> = {
+  g1: [
+    { ga: 56, weight_kg: 68, bp_systolic: 112, bp_diastolic: 70, urine_protein: 'negative', hemoglobin_g_dl: 11.8 },
+    { ga: 84, weight_kg: 69.2, bp_systolic: 114, bp_diastolic: 72, urine_protein: 'negative', fetal_heart_rate: 156 },
+    { ga: 112, weight_kg: 71, bp_systolic: 116, bp_diastolic: 70, urine_protein: 'negative', fetal_heart_rate: 150 },
+    { ga: 140, weight_kg: 73.1, bp_systolic: 118, bp_diastolic: 74, urine_protein: 'negative', fundal_height_cm: 20, fetal_heart_rate: 146, fetal_movements: 'normal' },
+    { ga: 168, weight_kg: 74.6, bp_systolic: 122, bp_diastolic: 76, urine_protein: 'trace', fundal_height_cm: 24, fetal_heart_rate: 144, fetal_movements: 'normal', hemoglobin_g_dl: 10.9 },
+  ],
+  g2: [
+    { ga: 56, weight_kg: 74, bp_systolic: 118, bp_diastolic: 76, urine_protein: 'negative', hemoglobin_g_dl: 12.4 },
+    { ga: 84, weight_kg: 74.8, bp_systolic: 120, bp_diastolic: 78, urine_protein: 'negative', fetal_heart_rate: 160 },
+  ],
+  g3: [
+    { ga: 56, weight_kg: 82, bp_systolic: 116, bp_diastolic: 72, urine_protein: 'negative', urine_glucose: 'negative', hemoglobin_g_dl: 11.6 },
+    { ga: 112, weight_kg: 84.5, bp_systolic: 118, bp_diastolic: 74, urine_protein: 'negative', urine_glucose: 'negative' },
+    { ga: 168, weight_kg: 87.9, bp_systolic: 124, bp_diastolic: 78, urine_protein: 'negative', urine_glucose: '1+', fundal_height_cm: 25, fetal_heart_rate: 142, fetal_movements: 'normal' },
+    { ga: 196, weight_kg: 90.2, bp_systolic: 128, bp_diastolic: 82, urine_protein: 'negative', urine_glucose: '2+', fundal_height_cm: 30, fetal_heart_rate: 140, fetal_movements: 'normal', hemoglobin_g_dl: 10.7 },
+    { ga: 224, weight_kg: 92.4, bp_systolic: 136, bp_diastolic: 86, urine_protein: 'trace', fundal_height_cm: 34, fetal_heart_rate: 138, fetal_movements: 'normal', presentation: 'cephalic', edema: 'mild' },
+    { ga: 245, weight_kg: 93.8, bp_systolic: 144, bp_diastolic: 93, urine_protein: '1+', fundal_height_cm: 37, fetal_heart_rate: 136, fetal_movements: 'normal', presentation: 'cephalic', edema: 'moderate' },
+  ],
+  g4: [
+    { ga: 70, weight_kg: 61, bp_systolic: 110, bp_diastolic: 68, urine_protein: 'negative', hemoglobin_g_dl: 11.2 },
+    { ga: 85, weight_kg: 61.9, bp_systolic: 112, bp_diastolic: 70, urine_protein: 'negative', fetal_heart_rate: 158 },
+  ],
+  g5: [
+    { ga: 63, weight_kg: 55, bp_systolic: 108, bp_diastolic: 66, urine_protein: 'negative', hemoglobin_g_dl: 11.4 },
+    { ga: 98, weight_kg: 56.1, bp_systolic: 110, bp_diastolic: 68, urine_protein: 'negative', fetal_heart_rate: 152 },
+    { ga: 126, weight_kg: 57, bp_systolic: 112, bp_diastolic: 70, urine_protein: 'negative', fetal_heart_rate: 148, fundal_height_cm: 16 },
+    { ga: 148, weight_kg: 57.4, bp_systolic: 114, bp_diastolic: 72, urine_protein: 'negative', fetal_heart_rate: 146, fetal_movements: 'reduced', hemoglobin_g_dl: 10.2 },
+  ],
+};
+
+export const DEMO_VISITS: AntenatalVisit[] = [];
+export const DEMO_VISIT_ENCOUNTERS: Encounter[] = [];
+for (const [pid, list] of Object.entries(seeds)) {
+  list.forEach((sd, i) => {
+    const { ga, ...vitals } = sd;
+    const ago = lmpOffset[pid] - ga;
+    const [patient, clinic] = pregPatient[pid];
+    const last = i === list.length - 1;
+    const encId = `ve-${pid}-${i}`;
+    DEMO_VISIT_ENCOUNTERS.push({
+      id: encId, patient_id: patient, clinic_id: clinic, specialty: 'obstetrics', encounter_type: 'antenatal_visit',
+      encounter_at: daysAgo(ago), provider_id: visitProvider[pid], is_private: false, status: last ? 'draft' : 'signed',
+      chief_complaint: 'Routine antenatal visit', assessment: null, plan: null,
+    });
+    DEMO_VISITS.push({
+      id: `v-${pid}-${i}`, pregnancy_id: pid, patient_id: patient, clinic_id: clinic, encounter_id: encId,
+      visit_date: dateAgo(ago), ga_days: ga, weight_kg: null, bp_systolic: null, bp_diastolic: null, pulse: null,
+      urine_protein: null, urine_glucose: null, fundal_height_cm: null, fetal_heart_rate: null, presentation: null,
+      fetal_movements: null, edema: null, hemoglobin_g_dl: null, notes: null, created_by: visitProvider[pid],
+      created_at: daysAgo(ago), ...vitals,
+    });
+  });
+}
+
+export const DEMO_DELIVERIES: Delivery[] = [
+  { id: 'dl1', pregnancy_id: 'g6', patient_id: 'p3', clinic_id: 'c-main', delivered_at: daysAgo(824), ga_days: 276,
+    onset: 'spontaneous', mode: 'svd', indication: null, anesthesia: 'epidural', blood_loss_ml: 300,
+    perineum: 'second_degree', complications: [], notes: null, recorded_by: 'u-cons' },
+];
+
+export const DEMO_NEWBORNS: Newborn[] = [
+  { id: 'nb1', delivery_id: 'dl1', birth_order: 1, sex: 'male', birth_weight_g: 3350, apgar_1: 8, apgar_5: 9,
+    outcome: 'live_birth', nicu_admission: false, notes: null },
+];

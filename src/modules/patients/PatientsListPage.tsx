@@ -79,7 +79,7 @@ export function PatientsListPage({ specialty: fixedSpecialty }: { specialty?: Sp
               ))}
             </ul>
             {/* Desktop: table */}
-            <div className="hidden overflow-x-auto md:block">
+            <div className="relative hidden overflow-x-auto md:block">
               <table className="min-w-full divide-y divide-slate-100">
                 <thead className="bg-slate-50">
                   <tr>

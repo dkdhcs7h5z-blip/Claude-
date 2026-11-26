@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { DataService, AuthUser } from './service';
 import type {
+  AntenatalVisitRow, Delivery, FetalAssessment, Newborn, ObstetricWorklistRow, Pregnancy,
   AccessGrant, AuditEvent, Clinic, DashboardStats, DocumentMeta, MyAccess, Patient,
   PatientClinical, Profile, ResearchProject, StaffMember,
 } from './types';
@@ -245,5 +246,65 @@ export class SupabaseService implements DataService {
   // --- research ------------------------------------------------------------------
   async listResearchProjects() {
     return check(await this.sb.from('research_projects').select('*').order('created_at', { ascending: false })) as ResearchProject[];
+  }
+
+  // --- obstetrics ------------------------------------------------------------------
+  async listObstetricWorklist(clinicId?: string | null) {
+    let q = this.sb.from('obstetric_worklist').select('*').order('edd', { ascending: true, nullsFirst: false }).limit(500);
+    if (clinicId) q = q.eq('clinic_id', clinicId);
+    return check(await q) as ObstetricWorklistRow[];
+  }
+
+  async getPregnancyDetail(pregnancyId: string) {
+    const pregnancy = check(await this.sb.from('pregnancies').select('*').eq('id', pregnancyId).maybeSingle()) as Pregnancy | null;
+    if (!pregnancy) return null;
+    const [visits, delivery, fetal] = await Promise.all([
+      this.sb.from('antenatal_visits')
+        .select('*, encounter:encounters!antenatal_visits_encounter_id_fkey(id, status, provider_id, is_private, assessment, plan, chief_complaint, signed_by, signed_at)')
+        .eq('pregnancy_id', pregnancyId).order('visit_date').order('created_at'),
+      this.sb.from('deliveries').select('*').eq('pregnancy_id', pregnancyId).maybeSingle(),
+      this.sb.from('fetal_assessments').select('*').eq('patient_id', pregnancy.patient_id).order('performed_at'),
+    ]);
+    const del = check(delivery) as Delivery | null;
+    const newborns = del
+      ? check(await this.sb.from('newborns').select('*').eq('delivery_id', del.id).order('birth_order')) as Newborn[]
+      : [];
+    return {
+      pregnancy,
+      visits: check(visits) as AntenatalVisitRow[],
+      delivery: del,
+      newborns,
+      fetal_assessments: (check(fetal) as FetalAssessment[]).filter((f) => !f.pregnancy_id || f.pregnancy_id === pregnancyId),
+    };
+  }
+
+  async createPregnancy(input: Parameters<DataService['createPregnancy']>[0]) {
+    return check(await this.sb.from('pregnancies').insert(input).select('*').single()) as Pregnancy;
+  }
+
+  async updatePregnancy(id: string, patch: Parameters<DataService['updatePregnancy']>[1]) {
+    return check(await this.sb.from('pregnancies').update(patch).eq('id', id).select('*').single()) as Pregnancy;
+  }
+
+  async recordAntenatalVisit(pregnancyId: string, visit: Parameters<DataService['recordAntenatalVisit']>[1], narrative: Parameters<DataService['recordAntenatalVisit']>[2]) {
+    return check(await this.sb.rpc('record_antenatal_visit', {
+      p_pregnancy_id: pregnancyId, p_visit: visit, p_encounter: narrative,
+    })) as string;
+  }
+
+  async updateAntenatalVisit(visitId: string, encounterId: string, visit: Parameters<DataService['updateAntenatalVisit']>[2], narrative: Parameters<DataService['updateAntenatalVisit']>[3]) {
+    const { is_private: _p, clinic_id: _c, ...text } = narrative;
+    check(await this.sb.from('encounters').update(text).eq('id', encounterId));
+    check(await this.sb.from('antenatal_visits').update(visit).eq('id', visitId));
+  }
+
+  async signEncounter(encounterId: string) {
+    check(await this.sb.from('encounters').update({ status: 'signed' }).eq('id', encounterId));
+  }
+
+  async recordDelivery(pregnancyId: string, delivery: Parameters<DataService['recordDelivery']>[1], newborns: Parameters<DataService['recordDelivery']>[2]) {
+    return check(await this.sb.rpc('record_delivery', {
+      p_pregnancy_id: pregnancyId, p_delivery: delivery, p_newborns: newborns,
+    })) as string;
   }
 }

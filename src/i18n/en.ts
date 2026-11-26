@@ -1,3 +1,4 @@
+import obEn from './ob.en';
 const en = {
   app: {
     name: "Women's Health & Reproductive Medicine Intelligence System",
@@ -204,6 +205,7 @@ const en = {
     backHome: 'Back to dashboard',
   },
   pwa: { updateAvailable: 'A new version is available.', reload: 'Reload' },
+  ob: obEn,
 };
 
 export default en;
