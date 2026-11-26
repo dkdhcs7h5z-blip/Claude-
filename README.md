@@ -35,20 +35,20 @@ With no Supabase credentials the app runs against an **in-memory demo backend** 
    ```bash
    npx supabase link --project-ref <your-ref>
    npx supabase db push              # applies supabase/migrations/*
-   npx supabase functions deploy invite-user
+   npx supabase functions deploy code-login --no-verify-jwt
+   npx supabase functions deploy staff-admin --no-verify-jwt
+   npx supabase secrets set SETUP_SECRET='<long random phrase>' ALLOWED_ORIGIN='https://your-site'
    ```
 3. Configure the frontend:
    ```bash
    cp .env.example .env.local        # set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
    npm run dev
    ```
-4. In the Supabase dashboard → Authentication: **disable public sign-ups** (staff are invited), and create your first user.
-5. Promote that user and create clinics (SQL editor):
-   ```sql
-   update public.profiles set is_super_admin = true where email = 'you@example.org';
-   insert into public.clinics (code, name_en, name_ar) values ('MAIN', 'Main Clinic', 'العيادة الرئيسية');
-   ```
-6. Invite other staff from **Staff & Roles**.
+4. In the Supabase dashboard → Authentication: **disable public sign-ups**. Staff accounts are created in the app.
+5. Open the site → **First-time setup** → enter the `SETUP_SECRET` to create the owner account and first clinic. Your owner **login code** is shown once.
+6. Add the team from **Staff & Roles**: each person gets a login code, a role, a specialty scope and individual permissions.
+
+No command line? Follow **[docs/GO_LIVE.md](docs/GO_LIVE.md)**: everything through the Supabase and Vercel websites, using the single-file [`supabase/setup.sql`](supabase/setup.sql).
 
 ## Scripts
 
@@ -57,7 +57,7 @@ With no Supabase credentials the app runs against an **in-memory demo backend** 
 | `npm run dev` | Development server |
 | `npm run build` | Type-check + production build (with service worker) |
 | `npm test` | Unit tests (dating, risk rules, care schedule, permission matrix ↔ SQL sync, access logic) |
-| `npm run test:db` | Applies all migrations to a scratch PostgreSQL DB and runs the **300-case RLS/authorization/clinical-integrity suite** (needs local `psql`) |
+| `npm run test:db` | Applies all migrations to a scratch PostgreSQL DB and runs the **328-case RLS/authorization/clinical-integrity suite** (needs local `psql`) |
 
 ## Project layout
 
@@ -73,7 +73,8 @@ src/
   layout/        Responsive app shell (sidebar flips side in RTL)
 supabase/
   migrations/    Schema, RLS, audit, RPCs, storage policies (ordered)
-  functions/     Edge functions (invite-user)
+  functions/     Edge functions (code-login, staff-admin)
+  setup.sql      All migrations in one file (generated: npm run db:bundle)
   tests/         Plain-PostgreSQL harness + RLS test suite
 docs/            Architecture, security model, roadmap
 ```
@@ -86,6 +87,7 @@ docs/            Architecture, security model, roadmap
 - [Gynecology clinical specification](docs/GYNECOLOGY.md)
 - [Infertility & IVF clinical specification](docs/FERTILITY.md)
 - [Fetal medicine clinical specification](docs/FETAL_MEDICINE.md)
+- [Going live (step by step)](docs/GO_LIVE.md)
 - [Roadmap](docs/ROADMAP.md) — Phase 2+
 
 ## Important

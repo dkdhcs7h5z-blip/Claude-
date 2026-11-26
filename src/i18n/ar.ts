@@ -1,3 +1,4 @@
+import teamAr from './team.ar';
 import fmAr from './fm.ar';
 import type { Translation } from './en';
 import obAr from './ob.ar';
@@ -173,7 +174,7 @@ const ar: Translation = {
     actions: {
       INSERT: 'إنشاء', UPDATE: 'تعديل', DELETE: 'حذف', VIEW: 'عرض', DOWNLOAD: 'تنزيل', PRINT: 'طباعة',
       EXPORT: 'تصدير', EMERGENCY_ACCESS: 'وصول طارئ', RESEARCH_QUERY: 'استعلام بحثي', SIGN_IN: 'تسجيل دخول',
-      SIGN_OUT: 'تسجيل خروج',
+      SIGN_OUT: 'تسجيل خروج', SIGN_IN_FAILED: 'محاولة دخول فاشلة', CODE_ISSUED: 'إصدار رمز دخول',
     },
   },
   admin: {
@@ -215,6 +216,7 @@ const ar: Translation = {
   gyn: gynAr,
   ivf: ivfAr,
   fm: fmAr,
+  team: teamAr,
 };
 
 export default ar;

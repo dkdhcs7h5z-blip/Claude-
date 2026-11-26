@@ -1,5 +1,12 @@
 # Security & Access Model
 
+## Sign-in with login codes
+
+- Each person has a 16-character code `HHHH-SSSS-SSSS-SSSS` from a 31-symbol alphabet without look-alikes. `HHHH` is a public handle; the 12-character secret (≈ 59 bits) is the account's Supabase password and is stored only as a bcrypt hash. Codes are generated with the platform CSPRNG and shown **once**.
+- `code-login` resolves the handle server-side, lets Supabase Auth verify the secret, and returns a normal session. **5 consecutive failures lock the handle for 15 minutes**; unknown handles lock too. Successes and failures are audited (`SIGN_IN`, `SIGN_IN_FAILED`).
+- `staff-admin` creates accounts and issues new codes only after re-checking the caller's rights with the same rules as the database. A new code ends the person's other sessions. Owner setup works only while no super administrator exists and only with `SETUP_SECRET`.
+- Per-person **permission overrides** (granted / revoked on top of the role) and **specialty scope** are enforced in the database (`private.has_permission`, `private.scope_allows`). Only super administrators can grant administrative permissions. A direct share to a person bypasses specialty scope by design.
+
 ## Roles
 
 Roles are assigned **per clinic** (`clinic_memberships.role`); one person can be a Consultant in one clinic and a Specialist in another. **Super Administrator** is the only global role (`profiles.is_super_admin`).
@@ -63,13 +70,14 @@ Researchers never query patient tables. `research_cohort(project)` (security def
 
 ## Verified by tests
 
-`npm run test:db` applies all migrations to a fresh PostgreSQL 16 database and runs 300 cases covering anonymous access, cross-clinic isolation, private records, role limits, sharing and revocation, break-glass, privilege escalation, encounter signing/amendment, storage paths, research de-identification, archiving, audit immutability, deactivation, and obstetric data integrity (dating rules, signed-visit immutability, private visit vitals, delivery rules), gynecology record integrity, and fertility integrity (embryo ownership and availability at transfer, frozen-embryo storage data, Gardner fields, retrieval counts, transfer outcome consistency, cross-clinic isolation), and fetal medicine integrity (scan-type matching, plurality limits, survey/conclusion consistency, cfDNA and procedure result rules, private-patient and read-only access).
+`npm run test:db` applies all migrations to a fresh PostgreSQL 16 database and runs 328 cases covering anonymous access, cross-clinic isolation, private records, role limits, sharing and revocation, break-glass, privilege escalation, encounter signing/amendment, storage paths, research de-identification, archiving, audit immutability, deactivation, and obstetric data integrity (dating rules, signed-visit immutability, private visit vitals, delivery rules), gynecology record integrity, and fertility integrity (embryo ownership and availability at transfer, frozen-embryo storage data, Gardner fields, retrieval counts, transfer outcome consistency, cross-clinic isolation), and fetal medicine integrity (scan-type matching, plurality limits, survey/conclusion consistency, cfDNA and procedure result rules, private-patient and read-only access).
 
 ## Production deployment checklist
 
 These are deployment responsibilities outside the codebase:
 
-- [ ] Disable public sign-up in Supabase Auth; staff are invited (`invite-user` function).
+- [ ] Disable public sign-up in Supabase Auth; staff accounts are created only through `staff-admin`.
+- [ ] Set `SETUP_SECRET` (≥ 12 characters) and `ALLOWED_ORIGIN` for the edge functions.
 - [ ] Enforce **MFA** for all staff (Supabase Auth MFA/TOTP); require it for admin roles at minimum.
 - [ ] Set password policy, session timeout and refresh-token rotation.
 - [ ] Choose a hosting region that meets your data-residency law; sign the provider's BAA/DPA where required (e.g. HIPAA, GDPR).

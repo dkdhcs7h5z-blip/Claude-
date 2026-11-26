@@ -5,10 +5,10 @@ import type {
   CervicalScreening, Colposcopy, GynProcedure, GynProfile, GynUltrasound, GynVisit,
   AntenatalVisit, Delivery, Newborn, FetalBiometry, PostnatalVisit, LabourObservation,
   AccessGrant, AuditEvent, Clinic, DocumentMeta, Encounter, FertilityCycle, FetalAssessment,
-  Patient, Pregnancy, Profile, ResearchProject,
+  Patient, Pregnancy, Profile, ResearchProject, Specialty,
   FmAnomalyScan, FmCfdna, FmDoppler, FmFirstTrimester, FmProcedure,
 } from './types';
-import type { Role } from '@/rbac/permissions';
+import type { Permission, Role } from '@/rbac/permissions';
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 const dateAgo = (n: number) => daysAgo(n).slice(0, 10);
@@ -18,8 +18,17 @@ export const DEMO_CLINICS: Clinic[] = [
   { id: 'c-ivf', code: 'IVF', name_en: 'Reproductive & Fetal Medicine Unit', name_ar: 'وحدة الطب التناسلي وطب الأجنة', is_active: true },
 ];
 
+export interface DemoMembership {
+  id: string;
+  clinic_id: string;
+  role: Role;
+  is_active: boolean;
+  granted_permissions?: Permission[];
+  revoked_permissions?: Permission[];
+  specialties?: Specialty[] | null;
+}
 export interface DemoUser extends Profile {
-  memberships: Array<{ id: string; clinic_id: string; role: Role; is_active: boolean }>;
+  memberships: DemoMembership[];
 }
 
 const profile = (p: Partial<Profile> & Pick<Profile, 'id' | 'full_name_en' | 'full_name_ar'>): Profile => ({

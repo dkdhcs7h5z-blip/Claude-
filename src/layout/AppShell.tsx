@@ -11,8 +11,8 @@ import { setLanguage, type Lang } from '@/i18n';
 import { clinicName, initials, profileName } from '@/lib/format';
 
 function useVisibleNav(): NavItem[] {
-  const { can } = useAuth();
-  return NAV_ITEMS.filter((n) => !n.perms || n.perms.some((p) => can(p)));
+  const { can, inScope } = useAuth();
+  return NAV_ITEMS.filter((n) => (!n.perms || n.perms.some((p) => can(p))) && (!n.specialty || inScope(n.specialty)));
 }
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {

@@ -1,4 +1,5 @@
 import type {
+  MembershipPatch, NewStaffMember, OwnerSetup,
   FetalMedicineDetail, FmCfdna, FmCfdnaInput, FmFetusInput, FmProcedure, FmProcedureInput, FmScanType, FmWorklistRow,
   CryoRow, EmbryoInput, EmbryoTransfer, EmbryoTransferInput, FertilityCycle, FertilityCycleInput, FertilityDetail,
   FertilityProfileInput, FertilityWorklistRow, SemenAnalysisInput, StimulationMonitoringInput,
@@ -11,7 +12,6 @@ import type {
   AccessGrant, AccessLevel, AuditEvent, Clinic, DashboardStats, DocumentCategory, DocumentMeta,
   MyAccess, Patient, PatientClinical, PatientInput, PatientQuery, Profile, ResearchProject, StaffMember,
 } from './types';
-import type { Role } from '@/rbac/permissions';
 
 export interface AuthUser {
   id: string;
@@ -31,6 +31,10 @@ export interface DataService {
   getCurrentUser(): Promise<AuthUser | null>;
   onAuthChange(cb: (user: AuthUser | null) => void): () => void;
   signInWithPassword(email: string, password: string): Promise<void>;
+  /** Code-only sign-in (HHHH-SSSS-SSSS-SSSS). */
+  signInWithCode(code: string): Promise<void>;
+  /** First-run: creates the owner (super administrator) and first clinic; returns the owner's code. */
+  bootstrapOwner(input: OwnerSetup): Promise<string>;
   sendPasswordReset(email: string): Promise<void>;
   signOut(): Promise<void>;
 
@@ -81,8 +85,13 @@ export interface DataService {
 
   // --- administration -----------------------------------------------------
   listStaff(clinicId?: string | null): Promise<StaffMember[]>;
-  updateMembership(membershipId: string, patch: { role?: Role; is_active?: boolean }): Promise<void>;
-  inviteStaff(input: { email: string; clinic_id: string; role: Role; full_name_en?: string; full_name_ar?: string }): Promise<void>;
+  updateMembership(membershipId: string, patch: MembershipPatch): Promise<void>;
+  /** Creates a code-only account; the code is returned once. */
+  createStaffMember(input: NewStaffMember): Promise<{ user_id: string; code: string }>;
+  /** Issues a new login code (the old one stops working); returned once. */
+  resetLoginCode(userId: string): Promise<string>;
+  /** Super administrators: every table the caller can read, for backup. */
+  exportAllData(): Promise<Record<string, unknown[]>>;
 
   // --- research -----------------------------------------------------------
   listResearchProjects(): Promise<ResearchProject[]>;

@@ -13,7 +13,7 @@ for f in migrations/*.sql; do
   "${PSQL[@]}" -d "$DB" -f "$f"
 done
 echo "→ running tests"
-for t in tests/rls_tests.sql tests/obstetrics_tests.sql tests/obstetrics_ext_tests.sql tests/gynecology_tests.sql tests/gynecology_ext_tests.sql tests/fertility_tests.sql tests/fetal_medicine_tests.sql tests/99_report.sql; do
+for t in tests/rls_tests.sql tests/obstetrics_tests.sql tests/obstetrics_ext_tests.sql tests/gynecology_tests.sql tests/gynecology_ext_tests.sql tests/fertility_tests.sql tests/fetal_medicine_tests.sql tests/staff_access_tests.sql tests/99_report.sql; do
   "${PSQL[@]}" -d "$DB" -f "$t"
 done
 echo "✔ all database tests passed"

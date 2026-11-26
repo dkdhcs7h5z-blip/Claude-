@@ -42,7 +42,7 @@ describe('patientCan (mirror of private.patient_can)', () => {
     user_id: uid, is_super_admin: superAdmin, is_active: true,
     memberships: role === 'super_admin' ? [] : [{
       clinic_id: clinic, clinic_code: clinic, clinic_name_en: clinic, clinic_name_ar: clinic, role,
-      permissions: [...ROLE_PERMISSIONS[role]],
+      permissions: [...ROLE_PERMISSIONS[role]], specialties: null,
     }],
   });
   const clinicPatient = { id: 'p', clinic_id: 'A', visibility: 'clinic' as const, primary_physician_id: null };
@@ -82,5 +82,27 @@ describe('patientCan (mirror of private.patient_can)', () => {
   it('still requires the role permission on a grant', () => {
     const g = [grant({ grantee_user_id: 'me', access_level: 'write' })];
     expect(patientCan(access('researcher', 'B'), privatePatient, g, 'patient.read')).toBe(false);
+  });
+});
+
+describe('per-member overrides and specialty scope', () => {
+  const member = (specialties: MyAccess['memberships'][number]['specialties'], permissions = [...ROLE_PERMISSIONS.nurse]): MyAccess => ({
+    user_id: 'me', is_super_admin: false, is_active: true,
+    memberships: [{ clinic_id: 'A', clinic_code: 'A', clinic_name_en: 'A', clinic_name_ar: 'A', role: 'nurse', permissions, specialties }],
+  });
+  const gyn = { id: 'p', clinic_id: 'A', visibility: 'clinic' as const, primary_physician_id: null, specialties: ['gynecology' as const] };
+  it('scope limits clinic access by specialty', () => {
+    expect(patientCan(member(null), gyn, [], 'patient.read')).toBe(true);
+    expect(patientCan(member(['gynecology']), gyn, [], 'patient.read')).toBe(true);
+    expect(patientCan(member(['obstetrics']), gyn, [], 'patient.read')).toBe(false);
+    expect(patientCan(member(['obstetrics']), { ...gyn, specialties: [] }, [], 'patient.read')).toBe(true);
+  });
+  it('a personal share bypasses scope', () => {
+    const g: AccessGrant = { id: 'g', patient_id: 'p', grantee_user_id: 'me', grantee_clinic_id: null, access_level: 'read', reason: 'x',
+      is_emergency: false, granted_by: 'x', granted_at: '2026-01-01', expires_at: null, revoked_at: null };
+    expect(patientCan(member(['obstetrics']), gyn, [g], 'patient.read')).toBe(true);
+  });
+  it('effective permissions drive checks', () => {
+    expect(patientCan(member(null, ['patient.read']), gyn, [], 'clinical.read')).toBe(false);
   });
 });

@@ -1,0 +1,40 @@
+const teamEn = {
+  code: {
+    label: 'Login code', placeholder: 'XXXX-XXXX-XXXX-XXXX', help: 'Enter the 16-character code you were given. Letters and digits only; dashes are added for you.',
+    signIn: 'Sign in', invalid: 'That code is not valid. Check it and try again.', format: 'Enter all 16 characters of the code.',
+    locked: 'Too many attempts. Try again after {{time}}.', disabled: 'This account has been disabled. Contact your administrator.',
+    demoOr: 'Or sign in with a login code',
+    shownOnce: 'Copy this code now and give it to the person privately. It is shown only once and cannot be recovered; you can always issue a new one.',
+    copy: 'Copy code', copied: 'Copied', saved: 'I have saved the code', titleFor: 'Login code for {{name}}',
+    issued: 'Code issued {{date}}', none: 'No login code yet', handle: 'Code {{handle}}',
+    reset: 'New code', resetConfirm: 'Issue a new code for {{name}}? Their current code stops working and they are signed out.',
+    mine: 'My login code', mineHelp: 'If someone else may have seen your code, issue a new one. The old code stops working at once and your other devices are signed out.',
+    myHandle: 'Your code starts with ', resetMine: 'Issue a new code for me',
+    resetMineConfirm: 'Issue a new login code for yourself? Your current code stops working immediately.',
+  },
+  setup: {
+    link: 'First-time setup', title: 'Set up the platform',
+    intro: 'Creates the owner account and the first clinic. This works only once, and needs the setup secret chosen during installation.',
+    secret: 'Setup secret', nameEn: 'Your name (English)', nameAr: 'Your name (Arabic)', personTitle: 'Title', clinicCode: 'Clinic code',
+    clinicCodeHelp: '2–12 letters or digits, e.g. MAIN', clinicNameEn: 'Clinic name (English)', clinicNameAr: 'Clinic name (Arabic)',
+    submit: 'Create owner account', done: 'Setup complete. This is your owner login code.', goToLogin: 'Go to sign in',
+    backToLogin: 'Back to sign in',
+  },
+  staff: {
+    add: 'Add team member', addTitle: 'New team member', editTitle: 'Access for {{name}}', editAccess: 'Edit access',
+    personTitle: 'Title', role: 'Role', roleHelp: 'The role sets the default permissions below; you can adjust them for this person.',
+    permissions: 'Permissions', permissionsHelp: 'Ticked means allowed. Changes from the role’s default are marked.',
+    added: 'added', removed: 'removed', ownerOnly: 'Only the owner can grant this',
+    specialties: 'Specialty access', allSpecialties: 'All specialties', someSpecialties: 'Only selected specialties',
+    specialtiesHelp: 'Patients outside these specialties are hidden from this person, unless a record is shared with them directly.',
+    create: 'Create and show code', saved: 'Access updated.', all: 'All specialties', custom: 'Custom permissions',
+    nameRequired: 'Enter the person’s name in English or Arabic.', chooseSpecialty: 'Choose at least one specialty.',
+    owner: 'Owner',
+  },
+  backup: {
+    title: 'Backup', export: 'Export all data', exporting: 'Exporting…', done: 'Exported {{n}} records from {{t}} tables.',
+    note: 'Downloads one file with every record except uploaded document files. It contains patient information: keep it somewhere safe and encrypted.',
+    freePlan: 'The free database plan has no automatic backups, so export regularly (for example every Friday).',
+  },
+};
+export default teamEn;

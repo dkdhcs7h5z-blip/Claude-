@@ -25,6 +25,17 @@ function ilikeTerm(s: string): string {
   return s.replace(/[%_,()\\]/g, ' ').trim();
 }
 
+/** Every table included in a full backup export (document files are stored separately). */
+export const EXPORT_TABLES = [
+  'clinics', 'profiles', 'clinic_memberships', 'patients', 'patient_access_grants', 'encounters', 'documents',
+  'pregnancies', 'antenatal_visits', 'fetal_assessments', 'fetal_biometry', 'labour_observations', 'deliveries', 'newborns', 'postnatal_visits',
+  'gyn_profiles', 'gyn_visits', 'gyn_ultrasounds', 'cervical_screenings', 'colposcopies', 'gyn_procedures', 'lab_results',
+  'menopause_assessments', 'urogyn_assessments',
+  'fertility_profiles', 'semen_analyses', 'fertility_cycles', 'stimulation_monitoring', 'embryos', 'embryo_transfers',
+  'fm_first_trimester', 'fm_anomaly_scans', 'fm_dopplers', 'fm_cfdna', 'fm_procedures',
+  'research_projects', 'research_project_members', 'research_enrollments', 'audit_log',
+] as const;
+
 export class SupabaseService implements DataService {
   readonly mode = 'supabase' as const;
   private sb: SupabaseClient;
@@ -51,6 +62,31 @@ export class SupabaseService implements DataService {
   async signInWithPassword(email: string, password: string) {
     const { error } = await this.sb.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
+  }
+
+  /** Edge functions return JSON errors with a non-2xx status; surface the message. */
+  private async invoke<T>(name: string, body: Record<string, unknown>): Promise<T> {
+    const { data, error } = await this.sb.functions.invoke(name, { body });
+    if (error) {
+      let message = error.message;
+      try {
+        const ctx = (error as { context?: Response }).context;
+        const j = ctx ? await ctx.json() as { error?: string; locked_until?: string } : null;
+        if (j?.error) message = j.locked_until ? `locked:${j.locked_until}` : j.error;
+      } catch { /* keep the generic message */ }
+      throw new Error(message);
+    }
+    return data as T;
+  }
+
+  async signInWithCode(code: string) {
+    const s = await this.invoke<{ access_token: string; refresh_token: string }>('code-login', { code });
+    const { error } = await this.sb.auth.setSession(s);
+    if (error) throw new Error(error.message);
+  }
+
+  async bootstrapOwner(input: Parameters<DataService['bootstrapOwner']>[0]) {
+    return (await this.invoke<{ code: string }>('staff-admin', { action: 'bootstrap', ...input })).code;
   }
 
   async sendPasswordReset(email: string) {
@@ -231,7 +267,7 @@ export class SupabaseService implements DataService {
   // --- administration ----------------------------------------------------------
   async listStaff(clinicId?: string | null): Promise<StaffMember[]> {
     let q = this.sb.from('clinic_memberships')
-      .select('id, user_id, clinic_id, role, is_active, profile:profiles!clinic_memberships_user_id_fkey(full_name_en, full_name_ar, email, title)')
+      .select('id, user_id, clinic_id, role, is_active, granted_permissions, revoked_permissions, specialties, profile:profiles!clinic_memberships_user_id_fkey(full_name_en, full_name_ar, email, title, login_handle, code_issued_at, is_super_admin)')
       .order('created_at');
     if (clinicId) q = q.eq('clinic_id', clinicId);
     const rows = check(await q) as unknown as Array<Omit<StaffMember, 'membership_id'> & { id: string }>;
@@ -242,10 +278,29 @@ export class SupabaseService implements DataService {
     check(await this.sb.from('clinic_memberships').update(patch).eq('id', membershipId));
   }
 
-  async inviteStaff(input: Parameters<DataService['inviteStaff']>[0]) {
-    // Runs server-side with the service role after re-checking admin.users.
-    const { error } = await this.sb.functions.invoke('invite-user', { body: input });
-    if (error) throw new Error(error.message);
+  async createStaffMember(input: Parameters<DataService['createStaffMember']>[0]) {
+    // Runs server-side with the service role after re-checking the caller's admin rights.
+    return this.invoke<{ user_id: string; code: string }>('staff-admin', { action: 'create', ...input });
+  }
+
+  async resetLoginCode(userId: string) {
+    return (await this.invoke<{ code: string }>('staff-admin', { action: 'reset_code', user_id: userId })).code;
+  }
+
+  async exportAllData() {
+    const out: Record<string, unknown[]> = {};
+    for (const table of EXPORT_TABLES) {
+      const rows: unknown[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await this.sb.from(table).select('*').range(from, from + 999);
+        if (error) throw new Error(`${table}: ${error.message}`);
+        rows.push(...(data ?? []));
+        if (!data || data.length < 1000) break;
+      }
+      out[table] = rows;
+    }
+    await this.sb.rpc('log_data_export', { p_context: { tables: EXPORT_TABLES.length } });
+    return out;
   }
 
   // --- research ------------------------------------------------------------------

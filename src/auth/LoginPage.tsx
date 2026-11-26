@@ -1,23 +1,23 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Lock, Languages, ShieldCheck, FlaskRound } from 'lucide-react';
+import { KeyRound, Languages, ShieldCheck, FlaskRound } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { api } from '@/data';
 import { DEMO_LOGIN_ORDER, DEMO_USERS } from '@/data/demoData';
 import { Alert, Button, Field, Input } from '@/components/ui';
 import { setLanguage, type Lang } from '@/i18n';
 import { profileName } from '@/lib/format';
+import { formatCodeInput, isCompleteCode } from '@/lib/loginCode';
+import { codeErrorMessage } from './codeErrors';
 
 export function LoginPage() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language as Lang;
-  const { user, signIn, loading } = useAuth();
+  const { user, signIn, signInWithCode, loading } = useAuth();
   const location = useLocation();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const from = (location.state as { from?: string } | null)?.from ?? '/';
@@ -26,15 +26,24 @@ export function LoginPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!isCompleteCode(code)) { setError(t('team.code.format')); return; }
     setBusy(true);
-    try { await signIn(email.trim(), password); } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+    try { await signInWithCode(code); } catch (err) { setError(codeErrorMessage(err, t, lang)); } finally { setBusy(false); }
   };
 
-  const reset = async () => {
-    if (!email) return;
-    await api.sendPasswordReset(email.trim());
-    setInfo(t('auth.resetSent'));
-  };
+  const codeForm = (
+    <form onSubmit={submit} className="space-y-4" noValidate>
+      <Field label={t('team.code.label')} htmlFor="login-code" help={t('team.code.help')}>
+        <Input id="login-code" name="login-code" dir="ltr" autoComplete="one-time-code" autoCapitalize="characters" autoCorrect="off"
+          spellCheck={false} inputMode="text" placeholder={t('team.code.placeholder')} value={code}
+          className="font-mono text-lg tracking-wider" onChange={(e) => setCode(formatCodeInput(e.target.value))} />
+      </Field>
+      {error && <Alert tone="error">{error}</Alert>}
+      <Button type="submit" className="w-full" loading={busy} icon={<KeyRound className="h-4 w-4" />}>
+        {busy ? t('auth.signingIn') : t('team.code.signIn')}
+      </Button>
+    </form>
+  );
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
@@ -86,27 +95,16 @@ export function LoginPage() {
                   );
                 })}
               </div>
-              {error && <Alert tone="error">{error}</Alert>}
+              <div className="border-t border-slate-200 pt-4">
+                <p className="mb-3 text-sm font-medium text-slate-700">{t('team.code.demoOr')}</p>
+                {codeForm}
+              </div>
             </div>
           ) : (
-            <form onSubmit={submit} className="mt-6 space-y-4">
-              <Field label={t('auth.email')} htmlFor="email">
-                <Input id="email" type="email" autoComplete="username" required value={email}
-                  onChange={(e) => setEmail(e.target.value)} dir="ltr" />
-              </Field>
-              <Field label={t('auth.password')} htmlFor="password">
-                <Input id="password" type="password" autoComplete="current-password" required value={password}
-                  onChange={(e) => setPassword(e.target.value)} dir="ltr" />
-              </Field>
-              {error && <Alert tone="error">{error}</Alert>}
-              {info && <Alert tone="success">{info}</Alert>}
-              <Button type="submit" className="w-full" loading={busy} icon={<Lock className="h-4 w-4" />}>
-                {busy ? t('auth.signingIn') : t('auth.signIn')}
-              </Button>
-              <button type="button" onClick={() => void reset()} className="text-sm font-medium text-brand-700 hover:underline">
-                {t('auth.forgot')}
-              </button>
-            </form>
+            <div className="mt-6 space-y-6">
+              {codeForm}
+              <Link to="/setup" className="block text-center text-xs text-slate-400 hover:text-slate-600">{t('team.setup.link')}</Link>
+            </div>
           )}
         </div>
       </div>

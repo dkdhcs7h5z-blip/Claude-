@@ -60,7 +60,7 @@ export function PatientDetailPage() {
   const lang = useLang();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { access, can } = useAuth();
+  const { access, can, inScope } = useAuth();
   const clinics = useClinics();
   const [params, setParams] = useSearchParams();
   const tab = (params.get('tab') as TabId | null) ?? 'overview';
@@ -88,7 +88,9 @@ export function PatientDetailPage() {
     if (!p) return [];
     const list: Array<{ id: TabId; label: string }> = [{ id: 'overview', label: t('patients.tabs.overview') }];
     if (allowed('clinical.read')) {
-      (['obstetrics', 'gynecology', 'infertility', 'fetal_medicine'] as const).forEach((s) => list.push({ id: s, label: t(`patients.tabs.${s}`) }));
+      (['obstetrics', 'gynecology', 'infertility', 'fetal_medicine'] as const)
+        .filter((s) => inScope(s) || p.specialties.includes(s))
+        .forEach((s) => list.push({ id: s, label: t(`patients.tabs.${s}`) }));
     }
     if (allowed('document.read')) list.push({ id: 'documents', label: t('patients.tabs.documents') });
     list.push({ id: 'sharing', label: t('patients.tabs.sharing') });

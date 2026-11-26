@@ -4,7 +4,8 @@ project_id = "womens-health-intelligence"
 [auth]
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:4173"]
-# Staff accounts are created by invitation only (supabase/functions/invite-user).
+# Staff accounts are created by administrators only (supabase/functions/staff-admin);
+# staff sign in with a login code (supabase/functions/code-login).
 enable_signup = false
 
 [auth.email]
@@ -12,3 +13,10 @@ enable_signup = false
 
 [storage]
 file_size_limit = "50MiB"
+
+[functions.code-login]
+verify_jwt = false
+
+[functions.staff-admin]
+# bootstrap is called before any account exists; other actions check the JWT themselves
+verify_jwt = false

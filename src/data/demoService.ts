@@ -12,7 +12,8 @@ import { gaDaysOn, todayIso } from '@/clinical/obstetrics';
 import { hadlockEfw } from '@/clinical/fetalGrowth';
 import { cprLow, mcaPsvMom } from '@/clinical/fetalMedicine';
 import type { Permission } from '@/rbac/permissions';
-import { ROLE_PERMISSIONS } from '@/rbac/permissions';
+import { PERMISSIONS } from '@/rbac/permissions';
+import { ADMIN_PERMISSIONS, effectivePermissions, formatCode, normaliseCode, randomCodePart } from '@/lib/loginCode';
 import { hasPermission, hasPermissionAnywhere, patientCan } from '@/rbac/access';
 import {
   DEMO_CLINICS, DEMO_CYCLES, DEMO_DOCUMENTS, DEMO_ENCOUNTERS, DEMO_FETAL, DEMO_GRANTS, DEMO_PATIENTS,
@@ -144,13 +145,15 @@ export class DemoService implements DataService {
       user_id: u.id,
       is_super_admin: u.is_super_admin && u.is_active,
       is_active: u.is_active,
+      login_handle: u.login_handle ?? null,
       memberships: u.memberships
         .filter((m) => m.is_active)
         .map((m) => {
           const c = DEMO_CLINICS.find((x) => x.id === m.clinic_id)!;
           return {
             clinic_id: c.id, clinic_code: c.code, clinic_name_en: c.name_en, clinic_name_ar: c.name_ar,
-            role: m.role, permissions: [...ROLE_PERMISSIONS[m.role]],
+            role: m.role, permissions: effectivePermissions(m.role, m.granted_permissions, m.revoked_permissions),
+            specialties: m.specialties ?? null,
           };
         }),
     };
@@ -204,6 +207,48 @@ export class DemoService implements DataService {
     writeSession(userId);
     this.log('SIGN_IN', null, null);
     this.emit();
+  }
+
+  /** Demo code secrets (held in memory only, like the hashed password on the server). */
+  private codeSecrets = new Map<string, string>();
+  private codeFailures = new Map<string, { n: number; until: number | null }>();
+
+  async signInWithCode(code: string) {
+    await delay();
+    const c = normaliseCode(code);
+    if (c.length !== 16) throw new Error('invalid_format');
+    const handle = c.slice(0, 4), secret = c.slice(4);
+    const f = this.codeFailures.get(handle);
+    if (f?.until && f.until > Date.now()) throw new Error(`locked:${new Date(f.until).toISOString()}`);
+    const u = this.users.find((x) => x.login_handle === handle);
+    if (!u || this.codeSecrets.get(u.id) !== secret) {
+      const n = (f?.until && f.until <= Date.now() ? 0 : f?.n ?? 0) + 1;
+      const until = n >= 5 ? Date.now() + 15 * 60_000 : null;
+      this.codeFailures.set(handle, { n, until });
+      this.log('SIGN_IN_FAILED', null, null, { actor_id: u?.id ?? null, context: { via: 'login_code', handle, failures: n } });
+      throw new Error(until ? `locked:${new Date(until).toISOString()}` : 'invalid_code');
+    }
+    if (!u.is_active) throw new Error('account_disabled');
+    this.codeFailures.delete(handle);
+    this.currentId = u.id;
+    writeSession(u.id);
+    this.log('SIGN_IN', null, null, { context: { via: 'login_code' } });
+    this.emit();
+  }
+
+  async bootstrapOwner(): Promise<string> {
+    await delay();
+    throw new Error('Setup has already been completed');
+  }
+
+  private issueCode(u: DemoUser): string {
+    let handle = u.login_handle;
+    while (!handle || this.users.some((x) => x !== u && x.login_handle === handle)) handle = randomCodePart(4);
+    const secret = randomCodePart(12);
+    u.login_handle = handle;
+    u.code_issued_at = nowIso();
+    this.codeSecrets.set(u.id, secret);
+    return formatCode(handle, secret);
   }
 
   async sendPasswordReset() { await delay(); }
@@ -449,7 +494,9 @@ export class DemoService implements DataService {
         && (a?.is_super_admin || a?.memberships.some((x) => x.clinic_id === m.clinic_id)))
       .map((m) => ({
         membership_id: m.id, user_id: u.id, clinic_id: m.clinic_id, role: m.role, is_active: m.is_active,
-        profile: { full_name_en: u.full_name_en, full_name_ar: u.full_name_ar, email: u.email, title: u.title },
+        granted_permissions: m.granted_permissions ?? [], revoked_permissions: m.revoked_permissions ?? [], specialties: m.specialties ?? null,
+        profile: { full_name_en: u.full_name_en, full_name_ar: u.full_name_ar, email: u.email, title: u.title,
+          login_handle: u.login_handle ?? null, code_issued_at: u.code_issued_at ?? null, is_super_admin: u.is_super_admin },
       })));
   }
 
@@ -463,6 +510,11 @@ export class DemoService implements DataService {
       if ((m.role === 'clinic_admin' || patch.role === 'clinic_admin') && !a?.is_super_admin) {
         throw new Forbidden('Only super administrators can appoint clinic administrators');
       }
+      const unknown = [...(patch.granted_permissions ?? []), ...(patch.revoked_permissions ?? [])].find((x) => !PERMISSIONS.includes(x));
+      if (unknown) throw new Error(`Unknown permission ${unknown}`);
+      const addsAdmin = (patch.granted_permissions ?? []).some((x) => ADMIN_PERMISSIONS.includes(x) && !(m.granted_permissions ?? []).includes(x));
+      if (addsAdmin && !a?.is_super_admin) throw new Forbidden('Only a super administrator can grant administrative permissions');
+      if (patch.specialties && !patch.specialties.length) throw new Error('Choose at least one specialty');
       Object.assign(m, patch);
       this.log('UPDATE', 'clinic_memberships', null, { clinic_id: m.clinic_id, changed_fields: Object.keys(patch) });
       return;
@@ -470,18 +522,59 @@ export class DemoService implements DataService {
     throw new Forbidden();
   }
 
-  async inviteStaff(input: Parameters<DataService['inviteStaff']>[0]) {
+  async createStaffMember(input: Parameters<DataService['createStaffMember']>[0]) {
     await delay(200);
     const a = this.access();
     if (!hasPermission(a, 'admin.users', input.clinic_id)) throw new Forbidden();
     if (input.role === 'clinic_admin' && !a?.is_super_admin) throw new Forbidden('Only super administrators can appoint clinic administrators');
+    if (input.granted_permissions.some((x) => ADMIN_PERMISSIONS.includes(x)) && !a?.is_super_admin) {
+      throw new Forbidden('Only super administrators can grant administrative permissions');
+    }
+    if (!input.full_name_en?.trim() && !input.full_name_ar?.trim()) throw new Error('Enter the person’s name');
+    if (input.specialties && !input.specialties.length) throw new Error('Choose at least one specialty');
     const id = `u-${crypto.randomUUID().slice(0, 8)}`;
-    this.users.push({
-      id, email: input.email, full_name_en: input.full_name_en ?? null, full_name_ar: input.full_name_ar ?? null, title: null,
-      preferred_language: 'en', is_super_admin: false, is_active: true,
-      memberships: [{ id: `m-${id}`, clinic_id: input.clinic_id, role: input.role, is_active: true }],
-    });
-    this.log('INSERT', 'clinic_memberships', null, { clinic_id: input.clinic_id });
+    const u: DemoUser = {
+      id, email: null, full_name_en: input.full_name_en?.trim() || null, full_name_ar: input.full_name_ar?.trim() || null,
+      title: input.title?.trim() || null, preferred_language: 'en', is_super_admin: false, is_active: true,
+      memberships: [{ id: `m-${id}`, clinic_id: input.clinic_id, role: input.role, is_active: true,
+        granted_permissions: input.granted_permissions, revoked_permissions: input.revoked_permissions, specialties: input.specialties }],
+    };
+    this.users.push(u);
+    const code = this.issueCode(u);
+    this.log('CODE_ISSUED', 'clinic_memberships', null, { clinic_id: input.clinic_id, context: { kind: 'create', target_user_id: id } });
+    return { user_id: id, code };
+  }
+
+  async resetLoginCode(userId: string) {
+    await delay(150);
+    const a = this.access();
+    const u = this.users.find((x) => x.id === userId);
+    if (!a || !u) throw new Error('User not found');
+    const allowed = userId === a.user_id || a.is_super_admin
+      || (!u.is_super_admin && u.memberships.some((m) => hasPermission(a, 'admin.users', m.clinic_id) && m.role !== 'clinic_admin'));
+    if (!allowed) throw new Forbidden();
+    const code = this.issueCode(u);
+    this.log('CODE_ISSUED', null, null, { context: { kind: 'reset', target_user_id: userId } });
+    return code;
+  }
+
+  async exportAllData() {
+    await delay(200);
+    if (!this.access()?.is_super_admin) throw new Forbidden('Only a super administrator can export all data');
+    this.log('EXPORT', null, null, { context: { scope: 'all' } });
+    return clone({
+      clinics: DEMO_CLINICS, profiles: this.users.map(({ memberships: _m, ...p }) => p),
+      clinic_memberships: this.users.flatMap((u) => u.memberships.map((m) => ({ ...m, user_id: u.id }))),
+      patients: this.patients, patient_access_grants: this.grants, encounters: this.encounters, documents: this.documents,
+      pregnancies: this.pregnancies, antenatal_visits: this.visits, fetal_assessments: this.fetal, fetal_biometry: this.biometry,
+      labour_observations: this.labour, deliveries: this.deliveries, newborns: this.newborns, postnatal_visits: this.postnatal,
+      gyn_profiles: this.gynProfiles, gyn_visits: this.gynVisits, gyn_ultrasounds: this.gynUs, cervical_screenings: this.screenings,
+      colposcopies: this.colposcopies, gyn_procedures: this.gynProcedures, lab_results: this.labs, menopause_assessments: this.mrs,
+      urogyn_assessments: this.iciq, fertility_profiles: this.fertilityProfiles, semen_analyses: this.semen, fertility_cycles: this.cycles,
+      stimulation_monitoring: this.monitoring, embryos: this.embryos, embryo_transfers: this.transfers,
+      fm_first_trimester: this.fmFirst, fm_anomaly_scans: this.fmAnomaly, fm_dopplers: this.fmDoppler, fm_cfdna: this.fmCfdna,
+      fm_procedures: this.fmProcedures, audit_log: this.audit,
+    }) as Record<string, unknown[]>;
   }
 
   // --- research -------------------------------------------------------------------

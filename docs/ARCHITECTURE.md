@@ -27,7 +27,7 @@
 │  (not exposed over the API)    │      └──────────────────────────────────────┘
 └────────────────┬──────────────┘
 ┌────────────────▼──────────────┐
-│ Edge Functions                 │  invite-user (service role, re-checks caller)
+│ Edge Functions                 │  code-login (code → session, lock-out) · staff-admin (accounts & codes, re-checks caller)
 └───────────────────────────────┘
 ```
 
@@ -60,6 +60,7 @@ Specialty-specific structured data that is still evolving lives in `jsonb` colum
 | `…0004_authorization_rls.sql` | helper functions, integrity triggers, RLS policies |
 | `…0005_audit_and_rpc.sql` | audit log + triggers; RPCs `get_my_access`, `dashboard_stats`, `log_access_event`, `request_emergency_access`, `research_cohort` |
 | `…0006_storage.sql` | private bucket and object policies |
+| `…0013_staff_access.sql` | per-member permission overrides and specialty scope, login handles, code-login lock-out and session RPCs, data-export audit |
 | `…0012_fetal_medicine.sql` | first-trimester screening, anomaly scan, Doppler (generated CPR / UtA mean, MCA PSV MoM), cfDNA, procedures; RPC `record_fm_scan`; `fm_worklist` view |
 | `…0011_fertility.sql` | couple work-up, semen analysis (generated TMSC), cycle fields, monitoring, embryos, transfers, worklist & cryo views |
 | `…0010_gynecology_extended.sql` | shared `lab_results`, `menopause_assessments` (MRS), `urogyn_assessments` (ICIQ-UI SF), O-RADS / RMI fields |

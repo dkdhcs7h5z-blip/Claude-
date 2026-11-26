@@ -26,6 +26,9 @@ export interface Profile {
   preferred_language: 'en' | 'ar';
   is_super_admin: boolean;
   is_active: boolean;
+  /** public half of the person's login code (code-only accounts) */
+  login_handle?: string | null;
+  code_issued_at?: string | null;
 }
 
 export interface Membership {
@@ -34,13 +37,17 @@ export interface Membership {
   clinic_name_en: string;
   clinic_name_ar: string;
   role: Role;
+  /** effective permissions: role ∪ granted − revoked */
   permissions: Permission[];
+  /** specialty scope; null = all specialties */
+  specialties: Specialty[] | null;
 }
 
 export interface MyAccess {
   user_id: string;
   is_super_admin: boolean;
   is_active: boolean;
+  login_handle?: string | null;
   memberships: Membership[];
 }
 
@@ -220,7 +227,7 @@ export interface AccessGrant {
 
 export type AuditAction =
   | 'INSERT' | 'UPDATE' | 'DELETE' | 'VIEW' | 'DOWNLOAD' | 'PRINT' | 'EXPORT'
-  | 'EMERGENCY_ACCESS' | 'RESEARCH_QUERY' | 'SIGN_IN' | 'SIGN_OUT';
+  | 'EMERGENCY_ACCESS' | 'RESEARCH_QUERY' | 'SIGN_IN' | 'SIGN_OUT' | 'SIGN_IN_FAILED' | 'CODE_ISSUED';
 
 export interface AuditEvent {
   id: number;
@@ -251,7 +258,39 @@ export interface StaffMember {
   clinic_id: string;
   role: Role;
   is_active: boolean;
-  profile: Pick<Profile, 'full_name_en' | 'full_name_ar' | 'email' | 'title'>;
+  granted_permissions: Permission[];
+  revoked_permissions: Permission[];
+  specialties: Specialty[] | null;
+  profile: Pick<Profile, 'full_name_en' | 'full_name_ar' | 'email' | 'title' | 'login_handle' | 'code_issued_at' | 'is_super_admin'>;
+}
+
+export interface MembershipPatch {
+  role?: Role;
+  is_active?: boolean;
+  granted_permissions?: Permission[];
+  revoked_permissions?: Permission[];
+  specialties?: Specialty[] | null;
+}
+
+export interface NewStaffMember {
+  full_name_en: string | null;
+  full_name_ar: string | null;
+  title: string | null;
+  clinic_id: string;
+  role: Role;
+  granted_permissions: Permission[];
+  revoked_permissions: Permission[];
+  specialties: Specialty[] | null;
+}
+
+export interface OwnerSetup {
+  setup_secret: string;
+  full_name_en: string | null;
+  full_name_ar: string | null;
+  title: string | null;
+  clinic_code: string;
+  clinic_name_en: string;
+  clinic_name_ar: string | null;
 }
 
 export interface ResearchProject {

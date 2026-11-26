@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
-    "test:db": "bash supabase/tests/run_db_tests.sh"
+    "test:db": "bash supabase/tests/run_db_tests.sh",
+    "db:bundle": "node scripts/bundle-sql.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",

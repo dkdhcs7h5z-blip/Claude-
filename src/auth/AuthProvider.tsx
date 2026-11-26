@@ -2,9 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/data';
 import type { AuthUser } from '@/data/service';
-import type { MyAccess, Profile } from '@/data/types';
+import type { MyAccess, Profile, Specialty } from '@/data/types';
 import type { Permission } from '@/rbac/permissions';
-import { hasPermission } from '@/rbac/access';
+import { hasPermission, specialtyScope } from '@/rbac/access';
 import { hasStoredLanguage, setLanguage } from '@/i18n';
 
 interface AuthState {
@@ -17,7 +17,11 @@ interface AuthState {
   setActiveClinicId: (id: string | null) => void;
   /** UI gate. Pass a clinicId for a clinic-specific check; otherwise "in any clinic". */
   can: (perm: Permission, clinicId?: string | null) => boolean;
+  /** Specialties this person works in (null = all). */
+  specialties: Specialty[] | null;
+  inScope: (s: Specialty) => boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithCode: (code: string) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -78,7 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthState>(() => ({
     loading, user, profile, access, activeClinicId, setActiveClinicId,
     can: (perm, clinicId) => hasPermission(access, perm, clinicId ?? null),
+    specialties: specialtyScope(access),
+    inScope: (s) => { const sc = specialtyScope(access); return sc == null || sc.includes(s); },
     signIn: async (email, password) => { setLoading(true); try { await api.signInWithPassword(email, password); } finally { setLoading(false); } },
+    signInWithCode: async (code) => { await api.signInWithCode(code); },
     signOut: async () => { await api.signOut(); qc.clear(); },
     refresh: async () => { await load(await api.getCurrentUser()); },
   }), [loading, user, profile, access, activeClinicId, setActiveClinicId, load, qc]);

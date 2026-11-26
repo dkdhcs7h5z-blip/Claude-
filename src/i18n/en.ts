@@ -1,3 +1,4 @@
+import teamEn from './team.en';
 import fmEn from './fm.en';
 import ivfEn from './ivf.en';
 import gynEn from './gyn.en';
@@ -170,7 +171,7 @@ const en = {
     actions: {
       INSERT: 'Created', UPDATE: 'Updated', DELETE: 'Deleted', VIEW: 'Viewed', DOWNLOAD: 'Downloaded', PRINT: 'Printed',
       EXPORT: 'Exported', EMERGENCY_ACCESS: 'Emergency access', RESEARCH_QUERY: 'Research query', SIGN_IN: 'Signed in',
-      SIGN_OUT: 'Signed out',
+      SIGN_OUT: 'Signed out', SIGN_IN_FAILED: 'Failed sign-in', CODE_ISSUED: 'Login code issued',
     },
   },
   admin: {
@@ -212,6 +213,7 @@ const en = {
   gyn: gynEn,
   ivf: ivfEn,
   fm: fmEn,
+  team: teamEn,
 };
 
 export default en;

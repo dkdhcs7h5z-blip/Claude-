@@ -15,7 +15,7 @@ import { ageInYears } from '@/clinical/obstetrics';
 export function DashboardPage() {
   const { t } = useTranslation();
   const lang = useLang();
-  const { profile, can, activeClinicId, user } = useAuth();
+  const { profile, can, activeClinicId, user, inScope } = useAuth();
   const { byId } = useProfiles();
   const canPatients = can('patient.read');
   const canAudit = can('audit.read');
@@ -66,7 +66,7 @@ export function DashboardPage() {
         <div>
           <h2 className="mb-3 text-sm font-semibold text-slate-700">{t('dashboard.quickAccess')}</h2>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {SPECIALTY_NAV.map((m) => (
+            {SPECIALTY_NAV.filter((m) => inScope(m.specialty!)).map((m) => (
               <Link key={m.key} to={m.path} className="card group flex flex-col gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-md">
                 <div className="flex items-center justify-between">
                   <Badge tone={m.tone}><m.icon className="h-4 w-4" /></Badge>

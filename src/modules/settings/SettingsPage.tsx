@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Save, ShieldCheck } from 'lucide-react';
+import { Download, KeyRound, Save, ShieldCheck } from 'lucide-react';
+import { CodeReveal } from '@/auth/CodeReveal';
 import { api } from '@/data';
 import { useAuth } from '@/auth/AuthProvider';
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select } from '@/components/ui';
@@ -16,6 +17,31 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [myCode, setMyCode] = useState<string | null>(null);
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [backup, setBackup] = useState<{ busy: boolean; msg: string | null; err: string | null }>({ busy: false, msg: null, err: null });
+
+  const newCode = async () => {
+    if (!access || !window.confirm(t('team.code.resetMineConfirm'))) return;
+    setCodeBusy(true); setError(null);
+    try { setMyCode(await api.resetLoginCode(access.user_id)); await refresh(); } catch (e) { setError((e as Error).message); } finally { setCodeBusy(false); }
+  };
+
+  const exportAll = async () => {
+    setBackup({ busy: true, msg: null, err: null });
+    try {
+      const data = await api.exportAllData();
+      const tables = Object.keys(data).length;
+      const records = Object.values(data).reduce((n, rows) => n + rows.length, 0);
+      const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), format: 'whrmis-backup-v1', tables: data }, null, 1)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `whrmis-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setBackup({ busy: false, msg: t('team.backup.done', { n: records, t: tables }), err: null });
+    } catch (e) { setBackup({ busy: false, msg: null, err: (e as Error).message }); }
+  };
 
   useEffect(() => {
     if (profile) setForm({ full_name_en: profile.full_name_en ?? '', full_name_ar: profile.full_name_ar ?? '', title: profile.title ?? '' });
@@ -60,6 +86,24 @@ export function SettingsPage() {
           </ul>
         </Card>
 
+        <Card title={t('team.code.mine')}>
+          <p className="text-sm text-slate-600">{t('team.code.mineHelp')}</p>
+          {access?.login_handle && <p className="mt-2 text-sm">{t('team.code.myHandle')}<span dir="ltr" className="font-mono font-semibold">{access.login_handle}-••••</span></p>}
+          <Button className="mt-3" variant="secondary" loading={codeBusy} icon={<KeyRound className="h-4 w-4" />} onClick={() => void newCode()}>{t('team.code.resetMine')}</Button>
+        </Card>
+
+        {access?.is_super_admin && (
+          <Card title={t('team.backup.title')}>
+            <p className="text-sm text-slate-600">{t('team.backup.note')}</p>
+            {api.mode !== 'demo' && <Alert tone="warning">{t('team.backup.freePlan')}</Alert>}
+            <Button className="mt-3" loading={backup.busy} icon={<Download className="h-4 w-4" />} onClick={() => void exportAll()}>
+              {backup.busy ? t('team.backup.exporting') : t('team.backup.export')}
+            </Button>
+            {backup.msg && <p className="mt-2 text-sm text-emerald-700">{backup.msg}</p>}
+            {backup.err && <div className="mt-2"><Alert tone="error">{backup.err}</Alert></div>}
+          </Card>
+        )}
+
         <Card title={t('settings.profile')} className="lg:col-span-2">
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label={t('settings.title_')}><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
@@ -71,9 +115,10 @@ export function SettingsPage() {
             {saved && <span className="text-sm text-emerald-700">{t('common.saved')}</span>}
           </div>
           {error && <div className="mt-3"><Alert tone="error">{error}</Alert></div>}
-          <p className="mt-4 text-xs text-slate-500" dir="ltr">{profile?.email}</p>
+          {profile?.email && <p className="mt-4 text-xs text-slate-500" dir="ltr">{profile.email}</p>}
         </Card>
       </div>
+      {myCode && <CodeReveal code={myCode} title={t('team.code.mine')} onClose={() => setMyCode(null)} />}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { RequireAuth, RequirePermission } from '@/auth/guards';
 import { LoginPage } from '@/auth/LoginPage';
+import { SetupPage } from '@/auth/SetupPage';
 import { AppShell } from '@/layout/AppShell';
 import { Alert, EmptyState, Spinner } from '@/components/ui';
 import { DashboardPage } from '@/modules/dashboard/DashboardPage';
@@ -52,6 +53,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/setup" element={<SetupPage />} />
           {/* print view: no app shell */}
           <Route path="patients/:id/antenatal-card/:pregnancyId"
             element={<RequireAuth><RequirePermission perm="clinical.read"><Suspense fallback={<Spinner />}><AntenatalCardPage /></Suspense></RequirePermission></RequireAuth>} />
