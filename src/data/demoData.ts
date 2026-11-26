@@ -6,6 +6,7 @@ import type {
   AntenatalVisit, Delivery, Newborn, FetalBiometry, PostnatalVisit, LabourObservation,
   AccessGrant, AuditEvent, Clinic, DocumentMeta, Encounter, FertilityCycle, FetalAssessment,
   Patient, Pregnancy, Profile, ResearchProject,
+  FmAnomalyScan, FmCfdna, FmDoppler, FmFirstTrimester, FmProcedure,
 } from './types';
 import type { Role } from '@/rbac/permissions';
 
@@ -103,6 +104,9 @@ export const DEMO_PATIENTS: Patient[] = [
   patient({ id: 'p11', clinic_id: 'c-main', mrn: 'MAIN-000108', first_name_en: 'Rana', last_name_en: 'Youssef',
     first_name_ar: 'رنا', last_name_ar: 'يوسف', date_of_birth: '1997-07-23', blood_group: 'O', rh_factor: 'positive',
     specialties: ['obstetrics'] }, 210),
+  patient({ id: 'p13', clinic_id: 'c-ivf', mrn: 'IVF-000204', first_name_en: 'Noor', last_name_en: 'Tarek',
+    first_name_ar: 'نور', last_name_ar: 'طارق', date_of_birth: '1995-08-19', blood_group: 'A', rh_factor: 'positive',
+    specialties: ['obstetrics', 'fetal_medicine'] }, 45),
 ];
 
 const pregDefaults = {
@@ -141,6 +145,9 @@ export const DEMO_PREGNANCIES: Pregnancy[] = [
   { ...pregDefaults, id: 'g7', patient_id: 'p10', clinic_id: 'c-main', lmp: dateAgo(286), edd: null, edd_basis: 'lmp', gravida: 2, para: 1,
     abortus: 0, living: 2, conception: 'spontaneous', plurality: 1, risk_level: 'low', risk_factors: ['previous_cs'], status: 'delivered',
     outcome_date: dateAgo(9) },
+  { ...pregDefaults, id: 'g9', patient_id: 'p13', clinic_id: 'c-ivf', lmp: dateAgo(128), edd: null, edd_basis: 'lmp', gravida: 1, para: 0,
+    abortus: 0, living: 0, conception: 'spontaneous', plurality: 2, risk_level: 'high', risk_factors: [], status: 'active',
+    booking_date: dateAgo(45), booking_weight_kg: 58, height_cm: 161, chorionicity: 'mcda', notes: 'Monochorionic diamniotic twins' },
   { ...pregDefaults, id: 'g8', patient_id: 'p11', clinic_id: 'c-main', lmp: dateAgo(275), edd: null, edd_basis: 'lmp', gravida: 1, para: 0,
     abortus: 0, living: 0, conception: 'spontaneous', plurality: 1, risk_level: 'low', risk_factors: [], status: 'active',
     booking_date: dateAgo(210), booking_weight_kg: 64, height_cm: 166 },
@@ -569,3 +576,84 @@ export const DEMO_TRANSFERS: EmbryoTransfer[] = [
     embryos_transferred: 1, embryo_day: 5, endometrium_mm: 9.1, difficulty: 'easy', beta_hcg_on: dateAgo(234), beta_hcg_value: 2,
     gestational_sacs: 0, fetal_hearts: 0, outcome: 'negative', pregnancy_id: null, notes: null, recorded_by: 'u-spec' },
 ];
+
+// --- Fetal medicine ------------------------------------------------------------------
+// Scan headers without growth biometry (the anomaly/Doppler headers fa1, fa2, fa3, fa4 above are reused).
+const fmHeader = (id: string, preg: string, patient: string, clinic: string, ago: number, ga: number, type: string, n: number, impression: string): FetalAssessment => ({
+  id, patient_id: patient, pregnancy_id: preg, clinic_id: clinic, assessment_type: type, performed_at: daysAgo(ago),
+  gestational_age_days: ga, fetus_number: n, impression,
+});
+export const DEMO_FM_SCANS: FetalAssessment[] = [
+  fmHeader('fm-g2-nt', 'g2', 'p2', 'c-main', 1, 83, 'nt_scan', 1, 'Increased NT with absent nasal bone; high-chance combined screen.'),
+  fmHeader('fm-g5-nt', 'g5', 'p8', 'c-ivf', 62, 88, 'nt_scan', 1, 'Low-chance screen; low PAPP-A.'),
+  fmHeader('fm-g5-dop1', 'g5', 'p8', 'c-ivf', 16, 134, 'doppler', 1, 'High uterine artery PI with notching.'),
+  fmHeader('fm-g1-dop1', 'g1', 'p1', 'c-main', 28, 140, 'doppler', 1, 'Anti-D titre 1:32 — MCA PSV surveillance.'),
+  fmHeader('fm-g1-dop2', 'g1', 'p1', 'c-main', 14, 154, 'doppler', 1, 'MCA PSV rising.'),
+  fmHeader('fm-g1-dop3', 'g1', 'p1', 'c-main', 2, 166, 'doppler', 1, 'MCA PSV above 1.5 MoM.'),
+  fmHeader('fm-g4-dop', 'g4', 'p7', 'c-ivf', 4, 196, 'doppler', 2, 'Twin B: raised UA PI, low CPR.'),
+  fmHeader('fm-g9-nt', 'g9', 'p13', 'c-ivf', 41, 87, 'nt_scan', 2, 'MCDA twins; NT discordance.'),
+  fmHeader('fm-g9-dop1', 'g9', 'p13', 'c-ivf', 14, 114, 'doppler', 2, 'Fortnightly MC surveillance — normal.'),
+  fmHeader('fm-g9-dop2', 'g9', 'p13', 'c-ivf', 1, 127, 'doppler', 2, 'Oligo/polyhydramnios sequence; donor bladder not seen.'),
+];
+
+const ftBase = { crl_mm: null, nt_mm: null, nasal_bone: null, dv_a_wave: null, tricuspid_regurgitation: null, fhr: null, papp_a_mom: null,
+  free_bhcg_mom: null, risk_t21: null, risk_t18: null, risk_t13: null, risk_method: null, risk_software: null, early_anatomy: null, notes: null } as const;
+const ft = (scan: string, preg: string, patient: string, clinic: string, ga: number, o: Partial<FmFirstTrimester>): FmFirstTrimester =>
+  ({ ...ftBase, id: `${scan}-${o.fetus_label ?? 'A'}`, fetal_assessment_id: scan, pregnancy_id: preg, patient_id: patient, clinic_id: clinic, ga_days: ga, fetus_label: 'A', ...o });
+export const DEMO_FM_FIRST: FmFirstTrimester[] = [
+  ft('fm-g2-nt', 'g2', 'p2', 'c-main', 83, { crl_mm: 58, nt_mm: 3.9, nasal_bone: 'absent', dv_a_wave: 'reversed', tricuspid_regurgitation: true, fhr: 162,
+    papp_a_mom: 0.45, free_bhcg_mom: 2.8, risk_t21: 38, risk_t18: 2200, risk_t13: 4500, risk_method: 'combined_extended', risk_software: 'FMF 2012' }),
+  ft('fm-g5-nt', 'g5', 'p8', 'c-ivf', 88, { crl_mm: 64, nt_mm: 1.7, nasal_bone: 'present', dv_a_wave: 'positive', fhr: 158, papp_a_mom: 0.32,
+    free_bhcg_mom: 0.9, risk_t21: 2400, risk_t18: 9800, risk_t13: 15000, risk_method: 'combined', risk_software: 'FMF 2012' }),
+  ft('fa3', 'g4', 'p7', 'c-ivf', 84, { fetus_label: 'A', crl_mm: 62, nt_mm: 1.6, nasal_bone: 'present', papp_a_mom: 1.1, free_bhcg_mom: 1.2,
+    risk_t21: 3500, risk_t18: 12000, risk_t13: 20000, risk_method: 'combined' }),
+  ft('fa3', 'g4', 'p7', 'c-ivf', 84, { fetus_label: 'B', crl_mm: 60, nt_mm: 1.8, nasal_bone: 'present', papp_a_mom: 1.1, free_bhcg_mom: 1.2,
+    risk_t21: 2900, risk_t18: 11000, risk_t13: 18000, risk_method: 'combined' }),
+  ft('fm-g9-nt', 'g9', 'p13', 'c-ivf', 87, { fetus_label: 'A', crl_mm: 61, nt_mm: 1.9, nasal_bone: 'present', risk_t21: 1800, risk_method: 'combined' }),
+  ft('fm-g9-nt', 'g9', 'p13', 'c-ivf', 87, { fetus_label: 'B', crl_mm: 59, nt_mm: 2.6, nasal_bone: 'present', risk_t21: 1800, risk_method: 'combined',
+    notes: 'NT discordance > 20 % — increased TTTS risk' }),
+];
+
+const anBase = { abnormal_structures: [] as string[], not_visualised: [] as string[], atrium_mm: null, tcd_mm: null, cisterna_magna_mm: null, nuchal_fold_mm: null,
+  renal_pelvis_mm: null, cervical_length_mm: null, placenta_location: null, placenta_os_mm: null, cord_vessels: 3 as const, amniotic_fluid: 'normal' as const,
+  soft_markers: [] as string[], fetal_sex: null, anomalies: null, conclusion: 'normal' as FmAnomalyScan['conclusion'], notes: null };
+export const DEMO_FM_ANOMALY: FmAnomalyScan[] = [
+  { ...anBase, id: 'fa1-an', fetal_assessment_id: 'fa1', pregnancy_id: 'g1', patient_id: 'p1', clinic_id: 'c-main', fetus_label: 'A', ga_days: 160,
+    atrium_mm: 6.2, tcd_mm: 22, cisterna_magna_mm: 5, nuchal_fold_mm: 4, cervical_length_mm: 34, placenta_location: 'low_lying', placenta_os_mm: 15,
+    fetal_sex: 'not_disclosed' },
+  { ...anBase, id: 'fa4-an', fetal_assessment_id: 'fa4', pregnancy_id: 'g5', patient_id: 'p8', clinic_id: 'c-ivf', fetus_label: 'A', ga_days: 126,
+    atrium_mm: 7, tcd_mm: 18, cisterna_magna_mm: 4, cervical_length_mm: 31, placenta_location: 'posterior', placenta_os_mm: 60,
+    soft_markers: ['echogenic_bowel'], conclusion: 'soft_markers', notes: 'Echogenic bowel — CMV serology sent' },
+];
+
+const dpBase = { ua_pi: null, ua_pi_centile: null, ua_edf: null, mca_pi: null, mca_pi_centile: null, mca_psv_cm_s: null, mca_psv_mom: null, cpr: null,
+  cpr_centile: null, uta_left_pi: null, uta_right_pi: null, uta_mean_pi: null, uta_pi_centile: null, uta_notching: null, dv_pi: null,
+  dv_pi_centile: null, dv_a_wave: null, uv_pulsation: null, mvp_cm: null, bladder_visible: null, hydrops: false, fetal_demise: false,
+  ctg: null, notes: null } as const;
+const dop = (scan: string, preg: string, patient: string, clinic: string, ga: number, o: Partial<FmDoppler>): FmDoppler =>
+  ({ ...dpBase, id: `${scan}-${o.fetus_label ?? 'A'}`, fetal_assessment_id: scan, pregnancy_id: preg, patient_id: patient, clinic_id: clinic, ga_days: ga, fetus_label: 'A', ...o });
+/** CPR, mean UtA PI and MCA PSV MoM are derived by DemoService, as the database does. */
+export const DEMO_FM_DOPPLER: FmDoppler[] = [
+  dop('fm-g1-dop1', 'g1', 'p1', 'c-main', 140, { ua_pi: 1.15, ua_edf: 'present', mca_pi: 1.7, mca_psv_cm_s: 28, dv_a_wave: 'positive', mvp_cm: 5.2 }),
+  dop('fm-g1-dop2', 'g1', 'p1', 'c-main', 154, { ua_pi: 1.1, ua_edf: 'present', mca_pi: 1.65, mca_psv_cm_s: 36, dv_a_wave: 'positive', mvp_cm: 5.6 }),
+  dop('fm-g1-dop3', 'g1', 'p1', 'c-main', 166, { ua_pi: 1.05, ua_edf: 'present', mca_pi: 1.5, mca_psv_cm_s: 49, dv_a_wave: 'positive', mvp_cm: 6.1 }),
+  dop('fm-g5-dop1', 'g5', 'p8', 'c-ivf', 134, { ua_pi: 1.35, ua_pi_centile: 88, ua_edf: 'present', mca_pi: 1.75, uta_left_pi: 1.95, uta_right_pi: 1.75,
+    uta_pi_centile: 97, uta_notching: true, dv_a_wave: 'positive', mvp_cm: 3.8 }),
+  dop('fa2', 'g5', 'p8', 'c-ivf', 148, { ua_pi: 1.62, ua_pi_centile: 97, ua_edf: 'present', mca_pi: 1.6, cpr_centile: 4, uta_left_pi: 1.9,
+    uta_right_pi: 1.7, uta_pi_centile: 98, uta_notching: true, dv_pi: 0.62, dv_pi_centile: 60, dv_a_wave: 'positive', mvp_cm: 2.4, ctg: 'not_done' }),
+  dop('fm-g4-dop', 'g4', 'p7', 'c-ivf', 196, { fetus_label: 'A', ua_pi: 0.98, ua_pi_centile: 45, ua_edf: 'present', mca_pi: 1.9, cpr_centile: 55, mvp_cm: 5.1 }),
+  dop('fm-g4-dop', 'g4', 'p7', 'c-ivf', 196, { fetus_label: 'B', ua_pi: 1.42, ua_pi_centile: 96, ua_edf: 'present', mca_pi: 1.35, cpr_centile: 6,
+    dv_a_wave: 'positive', mvp_cm: 3.0 }),
+  dop('fm-g9-dop1', 'g9', 'p13', 'c-ivf', 114, { fetus_label: 'A', ua_pi: 1.3, ua_edf: 'present', mvp_cm: 3.1, bladder_visible: true }),
+  dop('fm-g9-dop1', 'g9', 'p13', 'c-ivf', 114, { fetus_label: 'B', ua_pi: 1.2, ua_edf: 'present', mvp_cm: 6.5, bladder_visible: true }),
+  dop('fm-g9-dop2', 'g9', 'p13', 'c-ivf', 127, { fetus_label: 'A', ua_pi: 1.45, ua_edf: 'present', dv_a_wave: 'positive', mvp_cm: 1.4, bladder_visible: false }),
+  dop('fm-g9-dop2', 'g9', 'p13', 'c-ivf', 127, { fetus_label: 'B', ua_pi: 1.1, ua_edf: 'present', dv_a_wave: 'positive', mvp_cm: 9.6, bladder_visible: true }),
+];
+
+export const DEMO_FM_CFDNA: FmCfdna[] = [
+  { id: 'cf1', patient_id: 'p4', pregnancy_id: 'g3', clinic_id: 'c-main', sampled_on: dateAgo(175), ga_days: 70, laboratory: 'Reference genetics lab',
+    result_status: 'resulted', fetal_fraction_pct: 11.2, t21: 'low_risk', t18: 'low_risk', t13: 'low_risk', sex_chromosomes: 'not_tested',
+    fetal_sex: 'not_reported', resulted_on: dateAgo(168), notes: null },
+];
+
+export const DEMO_FM_PROCEDURES: FmProcedure[] = [];

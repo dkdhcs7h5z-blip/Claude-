@@ -42,6 +42,7 @@
 | Obstetrics | `pregnancies` (dating, booking, high-risk plan), `antenatal_visits` (1:1 with an encounter), `fetal_biometry`, `labour_observations`, `deliveries`, `newborns`, `postnatal_visits`; view `obstetric_worklist` |
 | Gynecology | `gyn_profiles`, `gyn_visits` (1:1 with an encounter), `gyn_ultrasounds`, `cervical_screenings`, `colposcopies`, `gyn_procedures`; view `gyn_worklist` |
 | Infertility & IVF | `fertility_profiles`, `semen_analyses`, `fertility_cycles` (extended), `stimulation_monitoring`, `embryos`, `embryo_transfers`; views `fertility_worklist`, `cryo_inventory` |
+| Fetal medicine | `fm_first_trimester`, `fm_anomaly_scans`, `fm_dopplers` (per fetus, on the shared `fetal_assessments` header), `fm_cfdna`, `fm_procedures`; view `fm_worklist` |
 | Shared clinical | `lab_results` (values with the reporting lab's reference range) |
 | Documents | `documents` (metadata, SHA-256, private flag) + storage bucket |
 | Research | `research_projects` (IRB), `research_project_members`, `research_enrollments` (pseudonymous subject codes) |
@@ -59,6 +60,7 @@ Specialty-specific structured data that is still evolving lives in `jsonb` colum
 | `…0004_authorization_rls.sql` | helper functions, integrity triggers, RLS policies |
 | `…0005_audit_and_rpc.sql` | audit log + triggers; RPCs `get_my_access`, `dashboard_stats`, `log_access_event`, `request_emergency_access`, `research_cohort` |
 | `…0006_storage.sql` | private bucket and object policies |
+| `…0012_fetal_medicine.sql` | first-trimester screening, anomaly scan, Doppler (generated CPR / UtA mean, MCA PSV MoM), cfDNA, procedures; RPC `record_fm_scan`; `fm_worklist` view |
 | `…0011_fertility.sql` | couple work-up, semen analysis (generated TMSC), cycle fields, monitoring, embryos, transfers, worklist & cryo views |
 | `…0010_gynecology_extended.sql` | shared `lab_results`, `menopause_assessments` (MRS), `urogyn_assessments` (ICIQ-UI SF), O-RADS / RMI fields |
 | `…0009_gynecology.sql` | gynecology tables, RLS, audit, RPC `record_gyn_visit`, `gyn_worklist` view |

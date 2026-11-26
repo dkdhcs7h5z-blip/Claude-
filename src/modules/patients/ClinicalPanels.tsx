@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Lock } from 'lucide-react';
-import type { Encounter, FertilityCycle, FetalAssessment, Pregnancy } from '@/data/types';
+import type { Encounter, FertilityCycle, Pregnancy } from '@/data/types';
 import { Badge, Card, EmptyState, type Tone } from '@/components/ui';
 import { effectiveEdd, formatGADays, gaDaysOn, gpal, trimesterOf } from '@/clinical/obstetrics';
 import { formatDate, formatDateTime } from '@/lib/format';
@@ -59,31 +59,6 @@ export function CyclesPanel({ items }: { items: FertilityCycle[] }) {
           ))}
         </ul>
       ) : <EmptyState title={t('clinical.noCycles')} />}
-    </Card>
-  );
-}
-
-export function FetalPanel({ items }: { items: FetalAssessment[] }) {
-  const { t } = useTranslation();
-  const lang = useLang();
-  return (
-    <Card title={t('clinical.fetal')} bodyClassName="p-0">
-      {items.length ? (
-        <ul className="divide-y divide-slate-100">
-          {items.map((f) => (
-            <li key={f.id} className="px-4 py-3 sm:px-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-800">{t(`clinical.assessmentType.${f.assessment_type}`, f.assessment_type)}</p>
-                <span className="text-xs text-slate-500">{formatDate(f.performed_at, lang)}
-                  {f.gestational_age_days != null && <> · <span className="ltr-num">{Math.floor(f.gestational_age_days / 7)}+{f.gestational_age_days % 7}</span></>}
-                  {f.fetus_number > 1 && <> · ×{f.fetus_number}</>}
-                </span>
-              </div>
-              {f.impression && <p className="mt-1 text-sm text-slate-600">{f.impression}</p>}
-            </li>
-          ))}
-        </ul>
-      ) : <EmptyState title={t('clinical.noFetal')} />}
     </Card>
   );
 }

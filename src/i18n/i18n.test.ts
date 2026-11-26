@@ -41,6 +41,17 @@ describe('translations', () => {
     expect([...missing]).toEqual([]);
   });
 
+  it('every template t(`prefix.${…}`) prefix exists as a group of keys', () => {
+    const missing = new Set<string>();
+    for (const file of sourceFiles(join(__dirname, '..'))) {
+      const src = readFileSync(file, 'utf8');
+      for (const m of src.matchAll(/\bt\(\s*`([a-zA-Z]\w*(?:\.\w+)+)\.\$\{/g)) {
+        if (![...enKeys.keys()].some((k) => k.startsWith(`${m[1]}.`))) missing.add(`${m[1]}  (${file.split('/src/')[1]})`);
+      }
+    }
+    expect([...missing]).toEqual([]);
+  });
+
   it('interpolation placeholders match between languages', () => {
     const vars = (s: unknown) => (typeof s === 'string' ? [...s.matchAll(/\{\{(\w+)/g)].map((m) => m[1]).sort().join(',') : '');
     const mismatched = [...enKeys.keys()].filter((k) => arKeys.has(k) && vars(enKeys.get(k)) !== vars(arKeys.get(k)));

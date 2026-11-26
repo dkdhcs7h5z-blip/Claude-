@@ -1,3 +1,4 @@
+import fmEn from './fm.en';
 import ivfEn from './ivf.en';
 import gynEn from './gyn.en';
 import obEn from './ob.en';
@@ -210,6 +211,7 @@ const en = {
   ob: obEn,
   gyn: gynEn,
   ivf: ivfEn,
+  fm: fmEn,
 };
 
 export default en;

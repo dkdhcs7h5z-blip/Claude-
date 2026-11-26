@@ -1,5 +1,6 @@
 import type { DataService, AuthUser } from './service';
 import type {
+  FetalMedicineDetail, FmAnomalyScan, FmCfdna, FmDoppler, FmFirstTrimester, FmProcedure, FmWorklistRow, FmFetusInput,
   LabResult, MenopauseAssessment, UrogynAssessment, CryoRow, Embryo, EmbryoTransfer, FertilityCycle, FertilityProfile,
   FertilityWorklistRow, SemenAnalysis, StimulationMonitoring,
   CervicalScreening, Colposcopy, GynDetail, GynProcedure, GynProfile, GynUltrasound, GynVisit, GynVisitRow, GynWorklistRow,
@@ -9,6 +10,7 @@ import type {
 } from './types';
 import { gaDaysOn, todayIso } from '@/clinical/obstetrics';
 import { hadlockEfw } from '@/clinical/fetalGrowth';
+import { cprLow, mcaPsvMom } from '@/clinical/fetalMedicine';
 import type { Permission } from '@/rbac/permissions';
 import { ROLE_PERMISSIONS } from '@/rbac/permissions';
 import { hasPermission, hasPermissionAnywhere, patientCan } from '@/rbac/access';
@@ -18,6 +20,7 @@ import {
   DEMO_VISITS, DEMO_VISIT_ENCOUNTERS, DEMO_DELIVERIES, DEMO_NEWBORNS,
   DEMO_LABS, DEMO_MRS, DEMO_ICIQ, DEMO_FERTILITY_PROFILES, DEMO_SEMEN, DEMO_MONITORING, DEMO_EMBRYOS, DEMO_TRANSFERS,
   DEMO_GYN_PROFILES, DEMO_GYN_VISITS, DEMO_GYN_ENCOUNTERS, DEMO_GYN_US, DEMO_SCREENINGS, DEMO_COLPOSCOPIES, DEMO_GYN_PROCEDURES,
+  DEMO_FM_SCANS, DEMO_FM_FIRST, DEMO_FM_ANOMALY, DEMO_FM_DOPPLER, DEMO_FM_CFDNA, DEMO_FM_PROCEDURES,
   DEMO_DELIVERIES_EXTRA, DEMO_SCANS, DEMO_BIOMETRY_SEED, DEMO_POSTNATAL, DEMO_POSTNATAL_ENCOUNTERS, DEMO_LABOUR,
 } from './demoData';
 import { buildStoragePath, MAX_UPLOAD_BYTES } from '@/lib/files';
@@ -34,6 +37,45 @@ function writeSession(v: string | null) {
   try { if (v) sessionStorage.setItem(SESSION_KEY, v); else sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
 }
 
+const round2 = (x: number) => Math.round(x * 100) / 100;
+/** Mirrors the generated columns and trigger of fm_dopplers. */
+function deriveDoppler(d: FmDoppler): FmDoppler {
+  return {
+    ...d,
+    cpr: d.mca_pi != null && d.ua_pi ? round2(d.mca_pi / d.ua_pi) : null,
+    uta_mean_pi: d.uta_left_pi != null && d.uta_right_pi != null ? round2((d.uta_left_pi + d.uta_right_pi) / 2) : null,
+    mca_psv_mom: mcaPsvMom(d.mca_psv_cm_s, d.ga_days),
+  };
+}
+
+const FM_STRUCTURES = ['skull', 'midline_falx', 'cavum_septi_pellucidi', 'lateral_ventricles', 'cerebellum', 'cisterna_magna', 'orbits', 'lips',
+  'profile', 'neck', 'lungs', 'diaphragm', 'heart_situs', 'four_chamber', 'lvot', 'rvot', 'three_vessel_trachea', 'stomach', 'bowel',
+  'abdominal_wall', 'cord_insertion', 'kidneys', 'bladder', 'spine', 'arms', 'hands', 'legs', 'feet', 'genitalia'];
+
+function validateCfdna(c: FmCfdna) {
+  const today = todayIso();
+  if (c.sampled_on > today || (c.resulted_on && c.resulted_on > today)) throw new Error('Dates cannot be in the future');
+  if (c.resulted_on && c.resulted_on < c.sampled_on) throw new Error('Result cannot precede sampling');
+  if (c.result_status === 'pending' && (c.t21 || c.t18 || c.t13 || c.sex_chromosomes || c.resulted_on)) throw new Error('A pending cfDNA cannot carry results');
+  if (c.result_status === 'resulted' && (!c.t21 || !c.resulted_on)) throw new Error('A resulted cfDNA needs the T21 result and a result date');
+  if (c.result_status === 'failed' && !c.resulted_on) throw new Error('A failed test needs a result date');
+}
+
+function validateProcedure(p: FmProcedure) {
+  const today = todayIso();
+  if (p.performed_on > today || (p.resulted_on && p.resulted_on > today)) throw new Error('Dates cannot be in the future');
+  if (p.resulted_on && p.resulted_on < p.performed_on) throw new Error('Result cannot precede the procedure');
+  if (!['pending', 'not_applicable'].includes(p.result_status) && !p.resulted_on) throw new Error('Enter the result date');
+  if (p.result_status === 'pending' && p.resulted_on) throw new Error('A pending result cannot carry a result date');
+  if (p.result_status === 'abnormal' && !p.result_summary?.trim()) throw new Error('An abnormal result needs a summary');
+  if (p.approach === 'transcervical' && p.procedure_type !== 'cvs') throw new Error('Transcervical approach is only for CVS');
+  if (['cvs', 'amniocentesis', 'cordocentesis'].includes(p.procedure_type) && !p.tests.length) throw new Error('Select at least one test for a diagnostic sample');
+  if (!['intrauterine_transfusion', 'cordocentesis'].includes(p.procedure_type) && (p.pre_hb_g_dl != null || p.post_hb_g_dl != null)) {
+    throw new Error('Fetal haemoglobin applies only to transfusion or cordocentesis');
+  }
+  if (p.complications.includes('none') && p.complications.length > 1) throw new Error('"None" cannot be combined with complications');
+}
+
 class Forbidden extends Error {
   constructor(msg = 'Permission denied (demo RLS)') { super(msg); }
 }
@@ -48,7 +90,12 @@ export class DemoService implements DataService {
   private patients: Patient[] = clone(DEMO_PATIENTS);
   private pregnancies = clone(DEMO_PREGNANCIES);
   private cycles = clone(DEMO_CYCLES);
-  private fetal = clone([...DEMO_FETAL, ...DEMO_SCANS]);
+  private fetal = clone([...DEMO_FETAL, ...DEMO_SCANS, ...DEMO_FM_SCANS]);
+  private fmFirst: FmFirstTrimester[] = clone(DEMO_FM_FIRST);
+  private fmAnomaly: FmAnomalyScan[] = clone(DEMO_FM_ANOMALY);
+  private fmDoppler: FmDoppler[] = clone(DEMO_FM_DOPPLER).map(deriveDoppler);
+  private fmCfdna: FmCfdna[] = clone(DEMO_FM_CFDNA);
+  private fmProcedures: FmProcedure[] = clone(DEMO_FM_PROCEDURES);
   private encounters: Encounter[] = clone([...DEMO_ENCOUNTERS, ...DEMO_VISIT_ENCOUNTERS, ...DEMO_POSTNATAL_ENCOUNTERS, ...DEMO_GYN_ENCOUNTERS]);
   private gynProfiles: GynProfile[] = clone(DEMO_GYN_PROFILES);
   private gynVisits: GynVisit[] = clone(DEMO_GYN_VISITS);
@@ -79,6 +126,11 @@ export class DemoService implements DataService {
   private blobs = new Map<string, Blob>();
   private listeners = new Set<(u: AuthUser | null) => void>();
   private currentId: string | null = readSession();
+
+  constructor() {
+    // seed data bypasses the database's tagging trigger; apply it here
+    for (const r of [...this.fmFirst, ...this.fmAnomaly, ...this.fmDoppler, ...this.fmCfdna, ...this.fmProcedures]) this.tagFetal(r.patient_id);
+  }
 
   // --- helpers ----------------------------------------------------------------
   private me(): DemoUser | null {
@@ -1126,5 +1178,170 @@ export class DemoService implements DataService {
     if (next.beta_hcg_on && next.beta_hcg_on <= next.transfer_on) throw new Error('β-hCG date must follow the transfer');
     Object.assign(t, patch);
     this.log('UPDATE', 'embryo_transfers', t.patient_id, { changed_fields: Object.keys(patch) });
+  }
+
+  // --- fetal medicine --------------------------------------------------------------
+  private tagFetal(patientId: string) {
+    const pt = this.patients.find((x) => x.id === patientId);
+    if (pt && !pt.specialties.includes('fetal_medicine')) pt.specialties = [...pt.specialties, 'fetal_medicine'];
+  }
+
+  async listFmWorklist(clinicId?: string | null): Promise<FmWorklistRow[]> {
+    await delay();
+    const worst = <T extends string>(order: T[], vals: Array<T | null>) => vals.reduce<T | null>((w, v) => (v && (!w || order.indexOf(v) > order.indexOf(w)) ? v : w), null);
+    const latestHeader = <R extends { fetal_assessment_id: string }>(rows: R[]) => {
+      const ids = [...new Set(rows.map((r) => r.fetal_assessment_id))];
+      const hdr = ids.map((id) => this.fetal.find((f) => f.id === id)!).filter(Boolean).sort((a, b) => b.performed_at.localeCompare(a.performed_at))[0];
+      return hdr ? { hdr, rows: rows.filter((r) => r.fetal_assessment_id === hdr.id) } : null;
+    };
+    return this.pregnancies
+      .filter((g) => g.status === 'active' && (!clinicId || g.clinic_id === clinicId))
+      .flatMap((g) => {
+        const p = this.patients.find((x) => x.id === g.patient_id);
+        if (!p || p.deleted_at || !this.can(p, 'clinical.read')) return [];
+        const cf = this.fmCfdna.filter((c) => c.pregnancy_id === g.id).sort((a, b) => b.sampled_on.localeCompare(a.sampled_on))[0];
+        const procs = this.fmProcedures.filter((x) => x.pregnancy_id === g.id);
+        if (!p.specialties.includes('fetal_medicine') && !cf && !procs.length) return [];
+        const ft = latestHeader(this.fmFirst.filter((x) => x.pregnancy_id === g.id));
+        const an = latestHeader(this.fmAnomaly.filter((x) => x.pregnancy_id === g.id));
+        const dp = latestHeader(this.fmDoppler.filter((x) => x.pregnancy_id === g.id));
+        const min = (v: Array<number | null>) => { const n = v.filter((x): x is number => x != null); return n.length ? Math.min(...n) : null; };
+        const max = (v: Array<number | null>) => { const n = v.filter((x): x is number => x != null); return n.length ? Math.max(...n) : null; };
+        const scans = this.fetal.filter((f) => f.pregnancy_id === g.id).map((f) => f.performed_at).sort();
+        return [{
+          pregnancy_id: g.id, patient_id: p.id, clinic_id: g.clinic_id, plurality: g.plurality, chorionicity: g.chorionicity, edd: g.edd, lmp: g.lmp,
+          cycle_length_days: g.cycle_length_days, ga_days: gaDaysOn(g), mrn: p.mrn, first_name_en: p.first_name_en, last_name_en: p.last_name_en,
+          first_name_ar: p.first_name_ar, last_name_ar: p.last_name_ar, date_of_birth: p.date_of_birth, rh_factor: p.rh_factor,
+          last_risk_t21: ft ? min(ft.rows.map((r) => r.risk_t21)) : null, last_risk_t18: ft ? min(ft.rows.map((r) => r.risk_t18)) : null,
+          last_risk_t13: ft ? min(ft.rows.map((r) => r.risk_t13)) : null, last_nt_mm: ft ? max(ft.rows.map((r) => r.nt_mm)) : null,
+          cfdna_status: cf?.result_status ?? null, cfdna_t21: cf?.t21 ?? null, cfdna_t18: cf?.t18 ?? null, cfdna_t13: cf?.t13 ?? null,
+          anomaly_conclusion: an ? worst(['normal', 'soft_markers', 'incomplete', 'anomaly_suspected'], an.rows.map((r) => r.conclusion)) : null,
+          anomaly_at: an?.hdr.performed_at ?? null, last_doppler_at: dp?.hdr.performed_at ?? null,
+          last_ua_edf: dp ? worst(['present', 'absent', 'reversed'], dp.rows.map((r) => r.ua_edf)) : null,
+          last_dv_a_wave: dp ? worst(['positive', 'absent', 'reversed'], dp.rows.map((r) => r.dv_a_wave)) : null,
+          last_mca_psv_mom: dp ? max(dp.rows.map((r) => r.mca_psv_mom)) : null, last_cpr: dp ? min(dp.rows.map((r) => r.cpr)) : null,
+          last_hydrops: dp ? dp.rows.some((r) => r.hydrops) : null,
+          last_cpr_low: dp ? dp.rows.some((r) => cprLow(r)) : null, last_ua_pi_high: dp ? dp.rows.some((r) => (r.ua_pi_centile ?? 0) > 95) : null,
+          last_mvp_min: dp ? min(dp.rows.map((r) => r.mvp_cm)) : null, last_mvp_max: dp ? max(dp.rows.map((r) => r.mvp_cm)) : null,
+          last_bladder_absent: dp ? dp.rows.some((r) => r.bladder_visible === false) : null,
+          pending_procedures: procs.filter((x) => x.result_status === 'pending').length, last_scan_at: scans[scans.length - 1] ?? null,
+        }];
+      });
+  }
+
+  async getFetalMedicineDetail(pregnancyId: string): Promise<FetalMedicineDetail | null> {
+    await delay(80);
+    const g = this.pregnancies.find((x) => x.id === pregnancyId);
+    const p = g && this.patients.find((x) => x.id === g.patient_id);
+    if (!g || !p || !this.can(p, 'clinical.read')) return null;
+    const by = <T extends { pregnancy_id: string }>(rows: T[]) => clone(rows.filter((r) => r.pregnancy_id === g.id));
+    const ga = (a: { ga_days: number | null; fetus_label?: string }, b: { ga_days: number | null; fetus_label?: string }) =>
+      (a.ga_days ?? 0) - (b.ga_days ?? 0) || (a.fetus_label ?? '').localeCompare(b.fetus_label ?? '');
+    return {
+      pregnancy: clone(g),
+      scans: clone(this.fetal.filter((f) => f.pregnancy_id === g.id)).sort((a, b) => a.performed_at.localeCompare(b.performed_at)),
+      biometry: by(this.biometry).sort(ga), firstTrimester: by(this.fmFirst).sort(ga), anomaly: by(this.fmAnomaly).sort(ga),
+      doppler: by(this.fmDoppler).sort(ga), cfdna: by(this.fmCfdna).sort((a, b) => a.sampled_on.localeCompare(b.sampled_on)),
+      procedures: by(this.fmProcedures).sort((a, b) => a.performed_on.localeCompare(b.performed_on)),
+    };
+  }
+
+  async recordFmScan(pregnancyId: string, type: Parameters<DataService['recordFmScan']>[1], scan: Parameters<DataService['recordFmScan']>[2], fetuses: FmFetusInput[]) {
+    await delay();
+    if (!['nt_scan', 'anomaly_scan', 'doppler'].includes(type)) throw new Error(`Unknown fetal medicine scan type ${type}`);
+    const g = this.pregnancyOrThrow(pregnancyId, 'clinical.write');
+    if (!fetuses.length || fetuses.length > g.plurality) throw new Error(`Provide between 1 and ${g.plurality} fetus records`);
+    if (new Set(fetuses.map((f) => f.fetus_label)).size !== fetuses.length) throw new Error('Fetus labels must be unique');
+    for (const f of fetuses) if (f.fetus_label.charCodeAt(0) - 64 > g.plurality) throw new Error(`Fetus ${f.fetus_label} does not exist in this pregnancy (plurality ${g.plurality})`);
+    if (new Date(scan.performed_at) > new Date()) throw new Error('Scan date cannot be in the future');
+    const clinicId = scan.clinic_id || g.clinic_id;
+    this.assertMember(clinicId);
+    const date = scan.performed_at.slice(0, 10);
+    const ga = gaDaysOn(g, date);
+    const id = crypto.randomUUID();
+    const link = (f: FmFetusInput) => ({ id: crypto.randomUUID(), fetal_assessment_id: id, pregnancy_id: g.id, patient_id: g.patient_id, clinic_id: clinicId, ga_days: ga, fetus_label: f.fetus_label });
+    const rows: Array<() => void> = [];
+    for (const f of fetuses) {
+      if (type === 'nt_scan') {
+        const r = { ...(f as FmFirstTrimester), ...link(f) };
+        if ((r.risk_t21 != null || r.risk_t18 != null || r.risk_t13 != null) && !r.risk_method) throw new Error('A risk needs its calculation method');
+        if (r.nt_mm != null && (r.nt_mm < 0.3 || r.nt_mm > 20)) throw new Error('NT must be between 0.3 and 20 mm');
+        if (r.crl_mm != null && (r.crl_mm < 20 || r.crl_mm > 100)) throw new Error('CRL must be between 20 and 100 mm');
+        rows.push(() => this.fmFirst.push(r));
+      } else if (type === 'anomaly_scan') {
+        const r = { ...(f as FmAnomalyScan), ...link(f) };
+        if ([...r.abnormal_structures, ...r.not_visualised].some((x) => !FM_STRUCTURES.includes(x))) throw new Error('Unknown structure');
+        if (r.abnormal_structures.some((x) => r.not_visualised.includes(x))) throw new Error('A structure cannot be both abnormal and not visualised');
+        if (r.conclusion === 'normal' && (r.abnormal_structures.length || r.not_visualised.length || r.soft_markers.length)) {
+          throw new Error('A normal conclusion requires a complete survey without markers');
+        }
+        if (r.conclusion === 'anomaly_suspected' && !r.abnormal_structures.length && !r.anomalies?.trim()) throw new Error('Name the abnormal structure or describe the anomaly');
+        if (r.placenta_os_mm != null && !r.placenta_location) throw new Error('Record the placental site with its distance to the os');
+        rows.push(() => this.fmAnomaly.push(r));
+      } else {
+        const r = deriveDoppler({ ...(f as FmDoppler), ...link(f), hydrops: !!(f as FmDoppler).hydrops, fetal_demise: !!(f as FmDoppler).fetal_demise } as FmDoppler);
+        const any = [r.ua_pi, r.ua_edf, r.mca_pi, r.mca_psv_cm_s, r.uta_left_pi, r.uta_right_pi, r.dv_pi, r.dv_a_wave, r.mvp_cm, r.bladder_visible, r.ctg].some((x) => x != null);
+        if (!any && !r.hydrops && !r.fetal_demise) throw new Error('Enter at least one Doppler or surveillance finding');
+        rows.push(() => this.fmDoppler.push(r));
+      }
+    }
+    this.fetal.push({ id, patient_id: g.patient_id, pregnancy_id: g.id, clinic_id: clinicId, assessment_type: type, performed_at: scan.performed_at,
+      gestational_age_days: ga, fetus_number: fetuses.length, impression: scan.impression });
+    rows.forEach((push) => push());
+    this.tagFetal(g.patient_id);
+    this.log('INSERT', type === 'nt_scan' ? 'fm_first_trimester' : type === 'anomaly_scan' ? 'fm_anomaly_scans' : 'fm_dopplers', g.patient_id);
+    return id;
+  }
+
+  async recordCfdna(pregnancyId: string, c: Parameters<DataService['recordCfdna']>[1]) {
+    await delay();
+    const g = this.pregnancyOrThrow(pregnancyId, 'clinical.write');
+    this.assertMember(g.clinic_id);
+    const row: FmCfdna = {
+      id: crypto.randomUUID(), patient_id: g.patient_id, pregnancy_id: g.id, clinic_id: g.clinic_id, sampled_on: c.sampled_on || todayIso(),
+      ga_days: null, laboratory: c.laboratory, result_status: 'pending', fetal_fraction_pct: null, t21: null, t18: null, t13: null,
+      sex_chromosomes: null, fetal_sex: null, resulted_on: null, notes: c.notes,
+    };
+    row.ga_days = gaDaysOn(g, row.sampled_on);
+    validateCfdna(row);
+    this.fmCfdna.push(row);
+    this.tagFetal(g.patient_id);
+    this.log('INSERT', 'fm_cfdna', g.patient_id);
+  }
+
+  async updateCfdna(id: string, patch: Partial<FmCfdna>) {
+    await delay();
+    const c = this.fmCfdna.find((x) => x.id === id);
+    if (!c) throw new Error('Record not found');
+    this.patientOrThrow(c.patient_id, 'clinical.write');
+    const next = { ...c, ...patch, id: c.id, patient_id: c.patient_id, pregnancy_id: c.pregnancy_id };
+    validateCfdna(next);
+    Object.assign(c, next);
+    this.log('UPDATE', 'fm_cfdna', c.patient_id);
+  }
+
+  async recordFmProcedure(pregnancyId: string, p: Parameters<DataService['recordFmProcedure']>[1]) {
+    await delay();
+    const g = this.pregnancyOrThrow(pregnancyId, 'clinical.write');
+    this.assertMember(g.clinic_id);
+    if (p.fetus_label.charCodeAt(0) - 64 > g.plurality) throw new Error('Fetus does not exist in this pregnancy');
+    const row: FmProcedure = { ...p, id: crypto.randomUUID(), patient_id: g.patient_id, pregnancy_id: g.id, clinic_id: g.clinic_id,
+      ga_days: gaDaysOn(g, p.performed_on), operator_id: this.currentId };
+    validateProcedure(row);
+    this.fmProcedures.push(row);
+    this.tagFetal(g.patient_id);
+    this.log('INSERT', 'fm_procedures', g.patient_id);
+  }
+
+  async updateFmProcedure(id: string, patch: Partial<FmProcedure>) {
+    await delay();
+    const p = this.fmProcedures.find((x) => x.id === id);
+    if (!p) throw new Error('Record not found');
+    this.patientOrThrow(p.patient_id, 'clinical.write');
+    const next = { ...p, ...patch, id: p.id, patient_id: p.patient_id, pregnancy_id: p.pregnancy_id };
+    next.ga_days = gaDaysOn(this.pregnancies.find((g) => g.id === p.pregnancy_id)!, next.performed_on);
+    validateProcedure(next);
+    Object.assign(p, next);
+    this.log('UPDATE', 'fm_procedures', p.patient_id);
   }
 }

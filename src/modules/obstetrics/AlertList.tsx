@@ -11,7 +11,10 @@ const style = {
 
 /** Status colours always ship with an icon and text, never colour alone. */
 export function AlertList({ alerts, compact = false }: { alerts: ClinicalAlert[]; compact?: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  /** coded values (e.g. grade "severe") are shown in the reader's language */
+  const localise = (v: ClinicalAlert['values']) => v && Object.fromEntries(Object.entries(v).map(([k, x]) =>
+    [k, typeof x === 'string' && i18n.exists(`ob.alertValues.${x}`) ? t(`ob.alertValues.${x}`) : x]));
   if (!alerts.length) return compact ? null : <p className="text-sm text-slate-500">{t('ob.alerts.none')}</p>;
   return (
     <ul className="space-y-1.5">
@@ -23,7 +26,7 @@ export function AlertList({ alerts, compact = false }: { alerts: ClinicalAlert[]
             <Icon className={clsx('mt-0.5 h-4 w-4 shrink-0', s.ic)} aria-hidden />
             <span>
               {a.values?.fetus ? <strong>{t('ob.fetusN', { label: a.values.fetus })}: </strong> : null}
-              {t(`ob.alerts.${a.code}`, a.values ?? {})}
+              {t(`ob.alerts.${a.code}`, localise(a.values) ?? {})}
             </span>
           </li>
         );

@@ -902,3 +902,188 @@ export interface CryoRow {
   first_name_ar: string | null;
   last_name_ar: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Fetal medicine
+// ---------------------------------------------------------------------------
+export type FmScanType = 'nt_scan' | 'anomaly_scan' | 'doppler';
+export type FetusLabel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
+interface FmChild {
+  id: string;
+  fetal_assessment_id: string;
+  pregnancy_id: string;
+  patient_id: string;
+  clinic_id: string;
+  fetus_label: FetusLabel;
+  ga_days: number | null;
+  notes: string | null;
+}
+export interface FmFirstTrimester extends FmChild {
+  crl_mm: number | null;
+  nt_mm: number | null;
+  nasal_bone: 'present' | 'absent' | 'hypoplastic' | 'not_assessed' | null;
+  dv_a_wave: 'positive' | 'absent' | 'reversed' | 'not_assessed' | null;
+  tricuspid_regurgitation: boolean | null;
+  fhr: number | null;
+  papp_a_mom: number | null;
+  free_bhcg_mom: number | null;
+  risk_t21: number | null;
+  risk_t18: number | null;
+  risk_t13: number | null;
+  risk_method: 'combined' | 'nt_maternal_age' | 'combined_extended' | 'second_trimester' | 'other' | null;
+  risk_software: string | null;
+  early_anatomy: string | null;
+}
+export type AnomalyConclusion = 'normal' | 'soft_markers' | 'anomaly_suspected' | 'incomplete';
+export interface FmAnomalyScan extends FmChild {
+  abnormal_structures: string[];
+  not_visualised: string[];
+  atrium_mm: number | null;
+  tcd_mm: number | null;
+  cisterna_magna_mm: number | null;
+  nuchal_fold_mm: number | null;
+  renal_pelvis_mm: number | null;
+  cervical_length_mm: number | null;
+  placenta_location: PlacentaLocation | null;
+  placenta_os_mm: number | null;
+  cord_vessels: 2 | 3 | null;
+  amniotic_fluid: 'normal' | 'oligohydramnios' | 'polyhydramnios' | 'anhydramnios' | null;
+  soft_markers: string[];
+  fetal_sex: 'female' | 'male' | 'undetermined' | 'not_disclosed' | null;
+  anomalies: string | null;
+  conclusion: AnomalyConclusion;
+}
+export interface FmDoppler extends FmChild {
+  ua_pi: number | null;
+  ua_pi_centile: number | null;
+  ua_edf: UaEdf | null;
+  mca_pi: number | null;
+  mca_pi_centile: number | null;
+  mca_psv_cm_s: number | null;
+  mca_psv_mom: number | null;
+  cpr: number | null;
+  cpr_centile: number | null;
+  uta_left_pi: number | null;
+  uta_right_pi: number | null;
+  uta_mean_pi: number | null;
+  uta_pi_centile: number | null;
+  uta_notching: boolean | null;
+  dv_pi: number | null;
+  dv_pi_centile: number | null;
+  dv_a_wave: 'positive' | 'absent' | 'reversed' | null;
+  uv_pulsation: boolean | null;
+  mvp_cm: number | null;
+  bladder_visible: boolean | null;
+  hydrops: boolean;
+  fetal_demise: boolean;
+  ctg: 'normal' | 'suspicious' | 'pathological' | 'not_done' | null;
+}
+type ChildInput<T> = Omit<T, 'id' | 'fetal_assessment_id' | 'pregnancy_id' | 'patient_id' | 'clinic_id' | 'ga_days'>;
+export type FmFirstTrimesterInput = ChildInput<FmFirstTrimester>;
+export type FmAnomalyScanInput = ChildInput<FmAnomalyScan>;
+export type FmDopplerInput = Omit<ChildInput<FmDoppler>, 'cpr' | 'uta_mean_pi' | 'mca_psv_mom'>;
+export type FmFetusInput = FmFirstTrimesterInput | FmAnomalyScanInput | FmDopplerInput;
+
+export type CfdnaCall = 'low_risk' | 'high_risk' | 'no_call' | 'not_tested';
+export interface FmCfdna {
+  id: string;
+  patient_id: string;
+  pregnancy_id: string;
+  clinic_id: string;
+  sampled_on: string;
+  ga_days: number | null;
+  laboratory: string | null;
+  result_status: 'pending' | 'resulted' | 'failed';
+  fetal_fraction_pct: number | null;
+  t21: CfdnaCall | null;
+  t18: CfdnaCall | null;
+  t13: CfdnaCall | null;
+  sex_chromosomes: CfdnaCall | null;
+  fetal_sex: 'female' | 'male' | 'not_reported' | null;
+  resulted_on: string | null;
+  notes: string | null;
+}
+export type FmCfdnaInput = Pick<FmCfdna, 'sampled_on' | 'laboratory' | 'notes'>;
+
+export type FmProcedureType = 'cvs' | 'amniocentesis' | 'cordocentesis' | 'intrauterine_transfusion' | 'amnioreduction' | 'amnioinfusion'
+  | 'laser_ablation' | 'shunt' | 'feto' | 'selective_reduction' | 'other';
+export interface FmProcedure {
+  id: string;
+  patient_id: string;
+  pregnancy_id: string;
+  clinic_id: string;
+  procedure_type: FmProcedureType;
+  performed_on: string;
+  ga_days: number | null;
+  fetus_label: FetusLabel;
+  indication: string;
+  approach: 'transabdominal' | 'transcervical' | null;
+  needle_gauge: number | null;
+  needle_passes: number | null;
+  transplacental: boolean | null;
+  anti_d_given: boolean | null;
+  volume_ml: number | null;
+  pre_hb_g_dl: number | null;
+  post_hb_g_dl: number | null;
+  complications: string[];
+  tests: string[];
+  result_status: 'pending' | 'normal' | 'abnormal' | 'failed' | 'not_applicable';
+  result_summary: string | null;
+  resulted_on: string | null;
+  operator_id: string | null;
+  notes: string | null;
+}
+export type FmProcedureInput = Omit<FmProcedure, 'id' | 'patient_id' | 'pregnancy_id' | 'clinic_id' | 'ga_days' | 'operator_id'>;
+
+export interface FetalMedicineDetail {
+  pregnancy: Pregnancy;
+  scans: FetalAssessment[];
+  biometry: FetalBiometry[];
+  firstTrimester: FmFirstTrimester[];
+  anomaly: FmAnomalyScan[];
+  doppler: FmDoppler[];
+  cfdna: FmCfdna[];
+  procedures: FmProcedure[];
+}
+
+export interface FmWorklistRow {
+  pregnancy_id: string;
+  patient_id: string;
+  clinic_id: string;
+  plurality: number;
+  chorionicity: Pregnancy['chorionicity'] | null;
+  edd: string | null;
+  lmp: string | null;
+  cycle_length_days: number | null;
+  ga_days: number | null;
+  mrn: string;
+  first_name_en: string | null;
+  last_name_en: string | null;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  date_of_birth: string;
+  rh_factor: 'positive' | 'negative' | null;
+  last_risk_t21: number | null;
+  last_risk_t18: number | null;
+  last_risk_t13: number | null;
+  last_nt_mm: number | null;
+  cfdna_status: FmCfdna['result_status'] | null;
+  cfdna_t21: CfdnaCall | null;
+  cfdna_t18: CfdnaCall | null;
+  cfdna_t13: CfdnaCall | null;
+  anomaly_conclusion: AnomalyConclusion | null;
+  anomaly_at: string | null;
+  last_doppler_at: string | null;
+  last_ua_edf: UaEdf | null;
+  last_dv_a_wave: 'positive' | 'absent' | 'reversed' | null;
+  last_mca_psv_mom: number | null;
+  last_cpr: number | null;
+  last_hydrops: boolean | null;
+  last_cpr_low: boolean | null;
+  last_ua_pi_high: boolean | null;
+  last_mvp_min: number | null;
+  last_mvp_max: number | null;
+  last_bladder_absent: boolean | null;
+  pending_procedures: number;
+  last_scan_at: string | null;
+}

@@ -1,3 +1,4 @@
+import fmAr from './fm.ar';
 import type { Translation } from './en';
 import obAr from './ob.ar';
 import gynAr from './gyn.ar';
@@ -213,6 +214,7 @@ const ar: Translation = {
   ob: obAr,
   gyn: gynAr,
   ivf: ivfAr,
+  fm: fmAr,
 };
 
 export default ar;

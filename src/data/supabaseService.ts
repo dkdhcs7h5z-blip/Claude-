@@ -8,6 +8,7 @@ import type {
   AntenatalVisitRow, Delivery, FetalAssessment, Newborn, ObstetricWorklistRow, Pregnancy,
   AccessGrant, AuditEvent, Clinic, DashboardStats, DocumentMeta, MyAccess, Patient,
   PatientClinical, Profile, ResearchProject, StaffMember,
+  FetalMedicineDetail, FmAnomalyScan, FmCfdna, FmDoppler, FmFirstTrimester, FmProcedure, FmWorklistRow,
 } from './types';
 import { buildStoragePath, MAX_UPLOAD_BYTES, sha256Hex } from '@/lib/files';
 
@@ -498,5 +499,57 @@ export class SupabaseService implements DataService {
 
   async updateTransfer(transferId: string, patch: Partial<EmbryoTransfer>) {
     check(await this.sb.from('embryo_transfers').update(patch).eq('id', transferId));
+  }
+
+  // --- fetal medicine --------------------------------------------------------------
+  async listFmWorklist(clinicId?: string | null) {
+    let q = this.sb.from('fm_worklist').select('*').limit(500);
+    if (clinicId) q = q.eq('clinic_id', clinicId);
+    return check(await q) as FmWorklistRow[];
+  }
+
+  async getFetalMedicineDetail(pregnancyId: string): Promise<FetalMedicineDetail | null> {
+    const pregnancy = check(await this.sb.from('pregnancies').select('*').eq('id', pregnancyId).maybeSingle()) as Pregnancy | null;
+    if (!pregnancy) return null;
+    const [scans, biometry, ft, an, dp, cf, pr] = await Promise.all([
+      this.sb.from('fetal_assessments').select('*').eq('pregnancy_id', pregnancyId).order('performed_at'),
+      this.sb.from('fetal_biometry').select('*').eq('pregnancy_id', pregnancyId).order('ga_days'),
+      this.sb.from('fm_first_trimester').select('*').eq('pregnancy_id', pregnancyId).order('ga_days').order('fetus_label'),
+      this.sb.from('fm_anomaly_scans').select('*').eq('pregnancy_id', pregnancyId).order('ga_days').order('fetus_label'),
+      this.sb.from('fm_dopplers').select('*').eq('pregnancy_id', pregnancyId).order('ga_days').order('fetus_label'),
+      this.sb.from('fm_cfdna').select('*').eq('pregnancy_id', pregnancyId).order('sampled_on'),
+      this.sb.from('fm_procedures').select('*').eq('pregnancy_id', pregnancyId).order('performed_on'),
+    ]);
+    return {
+      pregnancy, scans: check(scans) as FetalAssessment[], biometry: check(biometry) as FetalBiometry[],
+      firstTrimester: check(ft) as FmFirstTrimester[], anomaly: check(an) as FmAnomalyScan[], doppler: check(dp) as FmDoppler[],
+      cfdna: check(cf) as FmCfdna[], procedures: check(pr) as FmProcedure[],
+    };
+  }
+
+  async recordFmScan(pregnancyId: string, type: Parameters<DataService['recordFmScan']>[1], scan: Parameters<DataService['recordFmScan']>[2], fetuses: Parameters<DataService['recordFmScan']>[3]) {
+    return check(await this.sb.rpc('record_fm_scan', { p_pregnancy_id: pregnancyId, p_type: type, p_scan: scan, p_fetuses: fetuses })) as string;
+  }
+
+  private async pregnancyRef(pregnancyId: string) {
+    return check(await this.sb.from('pregnancies').select('patient_id, clinic_id').eq('id', pregnancyId).single()) as { patient_id: string; clinic_id: string };
+  }
+
+  async recordCfdna(pregnancyId: string, c: Parameters<DataService['recordCfdna']>[1]) {
+    const g = await this.pregnancyRef(pregnancyId);
+    check(await this.sb.from('fm_cfdna').insert({ ...c, pregnancy_id: pregnancyId, patient_id: g.patient_id, clinic_id: g.clinic_id }));
+  }
+
+  async updateCfdna(id: string, patch: Partial<FmCfdna>) {
+    check(await this.sb.from('fm_cfdna').update(patch).eq('id', id));
+  }
+
+  async recordFmProcedure(pregnancyId: string, p: Parameters<DataService['recordFmProcedure']>[1]) {
+    const g = await this.pregnancyRef(pregnancyId);
+    check(await this.sb.from('fm_procedures').insert({ ...p, pregnancy_id: pregnancyId, patient_id: g.patient_id, clinic_id: g.clinic_id }));
+  }
+
+  async updateFmProcedure(id: string, patch: Partial<FmProcedure>) {
+    check(await this.sb.from('fm_procedures').update(patch).eq('id', id));
   }
 }

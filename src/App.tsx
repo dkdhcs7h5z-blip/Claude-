@@ -7,16 +7,15 @@ import { LoginPage } from '@/auth/LoginPage';
 import { AppShell } from '@/layout/AppShell';
 import { Alert, EmptyState, Spinner } from '@/components/ui';
 import { DashboardPage } from '@/modules/dashboard/DashboardPage';
-import type { Specialty } from '@/data/types';
 
 // Route-level code splitting keeps the initial bundle small on mobile.
 const PatientsListPage = lazy(() => import('@/modules/patients/PatientsListPage').then((m) => ({ default: m.PatientsListPage })));
 const PatientDetailPage = lazy(() => import('@/modules/patients/PatientDetailPage').then((m) => ({ default: m.PatientDetailPage })));
 const PatientFormPage = lazy(() => import('@/modules/patients/PatientFormPage').then((m) => ({ default: m.PatientFormPage })));
-const SpecialtyPage = lazy(() => import('@/modules/specialty/SpecialtyPage').then((m) => ({ default: m.SpecialtyPage })));
 const GynecologyPage = lazy(() => import('@/modules/gynecology/GynecologyPage').then((m) => ({ default: m.GynecologyPage })));
 const InfertilityPage = lazy(() => import('@/modules/infertility/InfertilityPage').then((m) => ({ default: m.InfertilityPage })));
 const CryostoragePage = lazy(() => import('@/modules/infertility/CryostoragePage').then((m) => ({ default: m.CryostoragePage })));
+const FetalMedicinePage = lazy(() => import('@/modules/fetal-medicine/FetalMedicinePage').then((m) => ({ default: m.FetalMedicinePage })));
 const ObstetricsPage = lazy(() => import('@/modules/obstetrics/ObstetricsPage').then((m) => ({ default: m.ObstetricsPage })));
 const AntenatalCardPage = lazy(() => import('@/modules/obstetrics/AntenatalCardPage').then((m) => ({ default: m.AntenatalCardPage })));
 const ResearchPage = lazy(() => import('@/modules/research/ResearchPage').then((m) => ({ default: m.ResearchPage })));
@@ -24,10 +23,6 @@ const StaffPage = lazy(() => import('@/modules/admin/StaffPage').then((m) => ({ 
 const RolesPage = lazy(() => import('@/modules/admin/RolesPage').then((m) => ({ default: m.RolesPage })));
 const AuditLogPage = lazy(() => import('@/modules/admin/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
-
-const specialtyRoutes: Array<{ path: string; specialty: Specialty }> = [
-  { path: 'fetal-medicine', specialty: 'fetal_medicine' },
-];
 
 function AccountGate({ children }: { children: React.ReactNode }) {
   const { access } = useAuth();
@@ -66,10 +61,8 @@ export default function App() {
             <Route path="obstetrics" element={<P perm="clinical.read"><ObstetricsPage /></P>} />
             <Route path="gynecology" element={<P perm="clinical.read"><GynecologyPage /></P>} />
             <Route path="infertility" element={<P perm="clinical.read"><InfertilityPage /></P>} />
+            <Route path="fetal-medicine" element={<P perm="clinical.read"><FetalMedicinePage /></P>} />
             <Route path="infertility/cryostorage" element={<P perm="clinical.read"><CryostoragePage /></P>} />
-            {specialtyRoutes.map((r) => (
-              <Route key={r.path} path={r.path} element={<P perm="clinical.read"><SpecialtyPage specialty={r.specialty} /></P>} />
-            ))}
             <Route path="research" element={<P perm={['research.access', 'research.manage']}><ResearchPage /></P>} />
             <Route path="admin/staff" element={<P perm="admin.users"><StaffPage /></P>} />
             <Route path="admin/roles" element={<P perm="admin.users"><RolesPage /></P>} />

@@ -1,4 +1,5 @@
 import type {
+  FetalMedicineDetail, FmCfdna, FmCfdnaInput, FmFetusInput, FmProcedure, FmProcedureInput, FmScanType, FmWorklistRow,
   CryoRow, EmbryoInput, EmbryoTransfer, EmbryoTransferInput, FertilityCycle, FertilityCycleInput, FertilityDetail,
   FertilityProfileInput, FertilityWorklistRow, SemenAnalysisInput, StimulationMonitoringInput,
   LabResultInput,
@@ -131,5 +132,14 @@ export interface DataService {
   saveEmbryo(cycleId: string, e: EmbryoInput, embryoId?: string): Promise<void>;
   recordTransfer(cycleId: string, t: EmbryoTransferInput): Promise<void>;
   updateTransfer(transferId: string, patch: Partial<EmbryoTransfer>): Promise<void>;
+  // --- fetal medicine --------------------------------------------------------------
+  listFmWorklist(clinicId?: string | null): Promise<FmWorklistRow[]>;
+  getFetalMedicineDetail(pregnancyId: string): Promise<FetalMedicineDetail | null>;
+  /** Scan header + per-fetus fetal medicine records atomically. */
+  recordFmScan(pregnancyId: string, type: FmScanType, scan: { performed_at: string; impression: string | null; clinic_id?: string | null }, fetuses: FmFetusInput[]): Promise<string>;
+  recordCfdna(pregnancyId: string, c: FmCfdnaInput): Promise<void>;
+  updateCfdna(id: string, patch: Partial<FmCfdna>): Promise<void>;
+  recordFmProcedure(pregnancyId: string, p: FmProcedureInput): Promise<void>;
+  updateFmProcedure(id: string, patch: Partial<FmProcedure>): Promise<void>;
   recordUrogynAssessment(patientId: string, a: { assessed_at: string; frequency: number; amount: number; interference: number; leak_situations: string[]; notes: string | null }): Promise<void>;
 }

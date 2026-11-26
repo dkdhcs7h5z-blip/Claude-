@@ -127,7 +127,9 @@ export type AlertCode =
   // fertility
   | 'ohss_risk' | 'trigger_ready' | 'start_antagonist' | 'premature_lh' | 'p4_elevated' | 'thin_endometrium'
   | 'storage_consent_expired' | 'storage_consent_expiring' | 'beta_hcg_due' | 'poor_responder' | 'hyper_responder'
-  | 'iui_unlikely' | 'azoospermia' | 'tubal_blocked';
+  | 'iui_unlikely' | 'azoospermia' | 'tubal_blocked'
+  // fetal medicine
+  | import('./fetalMedicine').FmAlertCode;
 
 export interface ClinicalAlert {
   code: AlertCode;

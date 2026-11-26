@@ -12,7 +12,8 @@ Authentication · per-clinic RBAC with hybrid patient-level access · relational
   *Next:* PFDI-20 / PISQ, lab import (HL7), automatic O-RADS once validated against the ACR tables.
 - **Infertility & IVF ✅:** couple work-up · WHO 2021 semen analysis with TMSC · AMH/AFC reserve and Bologna criteria · stimulation monitoring with follicle/E2 charts and OHSS, trigger, antagonist, LH, P4 alerts · retrieval · embryology with Gardner grading, PGT and Vienna KPIs · transfer with β-hCG tracking and one-step obstetric registration · cryostorage with consent expiry · worklist. See [FERTILITY.md](FERTILITY.md).
   *Next:* partner as a linked person record, cryostorage chain-of-custody (witnessing, thaw/move log), cumulative live-birth analytics, donor programme.
-- **Fetal medicine:** first-trimester combined screening, anomaly scan reporting, growth/Doppler surveillance with centile charts, invasive procedures, multiple pregnancy, fetal therapy.
+- **Fetal medicine ✅:** 11–14 week scan with combined-screening risks from validated software, NT centiles and markers · cfDNA tracking · ISUOG anomaly scan with 29-structure checklist, soft markers, cervix and placenta · Doppler with MCA PSV MoM, CPR, FGR (Delphi) and Barcelona staging · TTTS Quintero staging · invasive procedures and fetal therapy with results and anti-D · worklist. See [FETAL_MEDICINE.md](FETAL_MEDICINE.md).
+  *Next:* fetal echocardiography report, built-in Doppler centile references, printable scan reports, DICOM image attachment.
 - Encounter editor with sign/amend workflow UI.
 
 ## Phase 3 — Operations
