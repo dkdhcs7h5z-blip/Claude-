@@ -41,10 +41,17 @@ function formatCode(handle: string, secret: string): string {
   return [handle, secret.slice(0, 4), secret.slice(4, 8), secret.slice(8, 12)].join('-');
 }
 
-const cors = {
-  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') ?? '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// ALLOWED_ORIGIN: comma-separated site addresses allowed to call the function (unset = any)
+const ALLOWED = (Deno.env.get('ALLOWED_ORIGIN') ?? '*').split(',').map((o) => o.trim()).filter(Boolean);
+let cors: Record<string, string> = {};
+function setCors(req: Request) {
+  const origin = req.headers.get('Origin') ?? '';
+  cors = {
+    'Access-Control-Allow-Origin': ALLOWED.includes('*') ? '*' : ALLOWED.includes(origin) ? origin : ALLOWED[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  };
+}
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -106,6 +113,7 @@ function sessionIdOf(authHeader: string): string | null {
 }
 
 Deno.serve(async (req) => {
+  setCors(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   let body: Record<string, unknown>;
