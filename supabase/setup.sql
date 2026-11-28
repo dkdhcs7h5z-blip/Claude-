@@ -4694,3 +4694,14 @@ $$;
 
 revoke execute on all functions in schema private from public, anon;
 grant execute on all functions in schema private to authenticated;
+
+-- The edge functions use the service role; integrity triggers it fires call
+-- private helpers, so it needs the same access as signed-in users.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant usage on schema private to service_role;
+    grant execute on all functions in schema private to service_role;
+  end if;
+end;
+$$;

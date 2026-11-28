@@ -91,3 +91,15 @@ select tst.ok((select locked_until > now() and user_id is null from public.code_
 insert into auth.sessions (user_id) select '00000000-0000-0000-0000-0000000000a5' from generate_series(1, 3);
 select tst.eq(public.admin_revoke_sessions('00000000-0000-0000-0000-0000000000a5',
   (select id from auth.sessions where user_id = '00000000-0000-0000-0000-0000000000a5' limit 1)), 2, 'other sessions revoked, current kept');
+
+-- The edge functions run as service_role: profile updates fire integrity triggers
+-- that call private helpers (regression: "permission denied for schema private").
+grant select, update on public.profiles to service_role;
+grant usage on schema tst to service_role;
+grant execute on all functions in schema tst to service_role;
+grant insert on tst.results to service_role;
+grant usage on sequence tst.results_n_seq to service_role;
+set role service_role;
+select tst.lives($q$update public.profiles set login_handle = 'Q8MZ', code_issued_at = now() where id = '00000000-0000-0000-0000-0000000000a6'$q$,
+  'service role can set login fields through the integrity triggers');
+reset role;
