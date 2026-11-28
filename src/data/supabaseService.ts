@@ -91,7 +91,7 @@ export class SupabaseService implements DataService {
 
   async sendPasswordReset(email: string) {
     const { error } = await this.sb.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/settings`,
+      redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}settings`,
     });
     if (error) throw new Error(error.message);
   }

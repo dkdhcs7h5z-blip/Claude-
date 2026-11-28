@@ -56,7 +56,7 @@ function Brand() {
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-3 px-5 py-4">
-      <img src="/icon.svg" alt="" className="h-9 w-9 rounded-lg ring-1 ring-white/20" />
+      <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" className="h-9 w-9 rounded-lg ring-1 ring-white/20" />
       <div className="min-w-0 leading-tight">
         <p className="truncate text-sm font-semibold text-white">{t('app.short')}</p>
         <p className="truncate text-[11px] text-brand-200">EMR · Research</p>

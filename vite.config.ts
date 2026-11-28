@@ -7,6 +7,8 @@ import { fileURLToPath, URL } from 'node:url';
 // VITE_EMBED=1: one self-contained HTML file for sandboxed previews (demo data,
 // in-memory routing, no service worker). The normal build is unaffected.
 const embed = !!process.env.VITE_EMBED;
+// Sub-path hosting (GitHub Pages serves the site at /<repo>/): BASE_PATH=/Claude-/
+const base = process.env.BASE_PATH || '/';
 
 export default defineConfig({
   plugins: embed ? [react(), viteSingleFile()] : [
@@ -21,7 +23,8 @@ export default defineConfig({
         theme_color: '#7c2d5b',
         background_color: '#f8fafc',
         display: 'standalone',
-        start_url: '/',
+        start_url: base,
+        scope: base,
         icons: [
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
         ],
@@ -39,6 +42,6 @@ export default defineConfig({
       ...(embed ? { 'virtual:pwa-register': fileURLToPath(new URL('./src/embed/pwa-stub.ts', import.meta.url)) } : {}),
     },
   },
-  ...(embed ? { base: './', build: { outDir: 'dist-embed' } } : {}),
+  ...(embed ? { base: './', build: { outDir: 'dist-embed' } } : { base }),
   test: { environment: 'node', include: ['src/**/*.test.ts'] },
 } as never);

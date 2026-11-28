@@ -49,7 +49,7 @@ const Router = import.meta.env.VITE_EMBED ? MemoryRouter : BrowserRouter;
 
 export default function App() {
   return (
-    <Router>
+    <Router basename={import.meta.env.VITE_EMBED ? undefined : import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

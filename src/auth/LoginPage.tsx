@@ -49,7 +49,7 @@ export function LoginPage() {
     <div className="flex min-h-screen flex-col lg:flex-row">
       <div className="relative hidden flex-1 flex-col justify-between overflow-hidden bg-gradient-to-br from-brand-700 via-brand-800 to-brand-900 p-12 text-white lg:flex">
         <div className="flex items-center gap-3">
-          <img src="/icon.svg" alt="" className="h-11 w-11 rounded-xl ring-1 ring-white/20" />
+          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" className="h-11 w-11 rounded-xl ring-1 ring-white/20" />
           <span className="text-lg font-semibold">{t('app.short')}</span>
         </div>
         <div>
@@ -63,7 +63,7 @@ export function LoginPage() {
         <div className="w-full max-w-md">
           <div className="mb-8 flex items-center justify-between">
             <div className="flex items-center gap-2 lg:hidden">
-              <img src="/icon.svg" alt="" className="h-9 w-9 rounded-lg" />
+              <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" className="h-9 w-9 rounded-lg" />
               <span className="font-semibold text-brand-800">{t('app.short')}</span>
             </div>
             <button onClick={() => void setLanguage(lang === 'ar' ? 'en' : 'ar')}
